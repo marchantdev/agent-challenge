@@ -9,7 +9,7 @@ import type { Action, IAgentRuntime, Memory, State, HandlerCallback, HandlerOpti
 
 import { solanaRpc, WELL_KNOWN_TOKENS } from "../utils/solanaRpc.js";
 import { fetchEthplorerInfo } from "../utils/ethRpc.js";
-import { formatUsd } from "../utils/api.js";
+import { formatUsd, cachedFetch } from "../utils/api.js";
 
 const DEFILLAMA_API = "https://api.llama.fi";
 
@@ -36,9 +36,8 @@ import { extractEthAddress, extractSolanaAddress } from "../utils/addressDetect.
 
 async function fetchTopProtocols(): Promise<ProtocolInfo[]> {
   try {
-    const res = await fetch(`${DEFILLAMA_API}/protocols`, { signal: AbortSignal.timeout(8000) });
-    if (!res.ok) return [];
-    const data = await res.json() as any[];
+    const data = await cachedFetch(`${DEFILLAMA_API}/protocols`) as any[];
+    if (!Array.isArray(data)) return [];
     return data
       .filter((p: any) => p.tvl > 0)
       .sort((a: any, b: any) => b.tvl - a.tvl)

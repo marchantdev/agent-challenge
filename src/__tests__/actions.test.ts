@@ -15,6 +15,8 @@ import { auditReconAction } from "../actions/auditRecon.ts";
 import { nosanaStatusAction } from "../actions/nosanaStatus.ts";
 import { analyzeWalletAction } from "../actions/analyzeWallet.ts";
 import { monitorProtocolAction } from "../actions/monitorProtocol.ts";
+import { compareProtocolsAction } from "../actions/compareProtocols.ts";
+import { generateAuditReportAction } from "../actions/generateAuditReport.ts";
 
 // Mock runtime and memory
 const mockRuntime = {} as any;
@@ -118,6 +120,34 @@ describe("Action Validation (keyword triggers)", () => {
   it("MONITOR_PROTOCOL does not trigger on unrelated text", async () => {
     expect(await monitorProtocolAction.validate!(mockRuntime, makeMemory("hello world"))).toBe(false);
   });
+
+  it("COMPARE_PROTOCOLS triggers on 'compare X vs Y'", async () => {
+    expect(await compareProtocolsAction.validate!(mockRuntime, makeMemory("Compare Aave vs Compound"))).toBe(true);
+  });
+
+  it("COMPARE_PROTOCOLS triggers on 'X versus Y'", async () => {
+    expect(await compareProtocolsAction.validate!(mockRuntime, makeMemory("Uniswap versus Curve comparison"))).toBe(true);
+  });
+
+  it("COMPARE_PROTOCOLS does not trigger on single protocol name", async () => {
+    expect(await compareProtocolsAction.validate!(mockRuntime, makeMemory("assess Aave"))).toBe(false);
+  });
+
+  it("GENERATE_AUDIT_REPORT triggers on 'audit report for X'", async () => {
+    expect(await generateAuditReportAction.validate!(mockRuntime, makeMemory("audit report for Aave"))).toBe(true);
+  });
+
+  it("GENERATE_AUDIT_REPORT triggers on 'full audit of X'", async () => {
+    expect(await generateAuditReportAction.validate!(mockRuntime, makeMemory("full audit of Compound"))).toBe(true);
+  });
+
+  it("GENERATE_AUDIT_REPORT triggers on 'security report'", async () => {
+    expect(await generateAuditReportAction.validate!(mockRuntime, makeMemory("security report for Uniswap"))).toBe(true);
+  });
+
+  it("GENERATE_AUDIT_REPORT does not trigger on unrelated text", async () => {
+    expect(await generateAuditReportAction.validate!(mockRuntime, makeMemory("what is TVL?"))).toBe(false);
+  });
 });
 
 describe("Action metadata", () => {
@@ -132,10 +162,12 @@ describe("Action metadata", () => {
     nosanaStatusAction,
     analyzeWalletAction,
     monitorProtocolAction,
+    compareProtocolsAction,
+    generateAuditReportAction,
   ];
 
-  it("all 10 actions are defined", () => {
-    expect(actions).toHaveLength(10);
+  it("all 12 actions are defined", () => {
+    expect(actions).toHaveLength(12);
   });
 
   it("all actions have name, description, and handler", () => {

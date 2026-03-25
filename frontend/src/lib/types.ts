@@ -76,6 +76,14 @@ export interface NosanaNetwork {
   networkVersion: string;
 }
 
+export interface EvaluatorStats {
+  totalResponses: number;
+  securityScoresIncluded: number;
+  recommendationsIncluded: number;
+  sourcesAttributed: number;
+  evaluator: string;
+}
+
 export type View = "dashboard" | "chat" | "scanner" | "protocols" | "nosana";
 
 export type RiskLevel = "Critical" | "High" | "Medium" | "Low" | "Info";

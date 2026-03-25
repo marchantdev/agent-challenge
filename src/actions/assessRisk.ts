@@ -123,6 +123,65 @@ export async function computeSecurityScore(protocol: any): Promise<SecurityScore
   return { total, tvlStability, verification, maturity, exploitHistory, label, emoji };
 }
 
+export interface SecurityScore {
+  total: number;          // 0-100
+  tvlStability: number;   // 0-25
+  verification: number;   // 0-25
+  maturity: number;       // 0-25
+  exploitHistory: number; // 0-25
+  riskLabel: string;      // "Low Risk" | "Moderate Risk" | "High Risk"
+}
+
+/**
+ * Compute a deterministic security score for a protocol using DefiLlama data.
+ * Returns null if the protocol isn't found.
+ */
+export async function computeSecurityScore(protocolName: string): Promise<SecurityScore | null> {
+  const data = await fetchProtocolData(protocolName);
+  if (!data) return null;
+
+  const tvl = data.tvl || 0;
+  const change1d = data.change_1d ?? 0;
+  const chains = (data.chains || []).length;
+  const audits = data.audits || 0;
+
+  // TVL Stability (0-25): higher TVL + lower volatility = better
+  let tvlStability = 10;
+  if (tvl >= 1e9) tvlStability = 25;
+  else if (tvl >= 100e6) tvlStability = 20;
+  else if (tvl >= 10e6) tvlStability = 15;
+  else if (tvl >= 1e6) tvlStability = 10;
+  else tvlStability = 5;
+  if (Math.abs(change1d) > 10) tvlStability = Math.max(0, tvlStability - 5);
+
+  // Verification (0-25): audits + open source
+  let verification = 10;
+  if (audits >= 3) verification = 25;
+  else if (audits >= 2) verification = 20;
+  else if (audits >= 1) verification = 15;
+  else verification = 5;
+
+  // Maturity (0-25): chain count + category presence
+  let maturity = 10;
+  if (chains >= 5) maturity = 25;
+  else if (chains >= 3) maturity = 22;
+  else if (chains >= 2) maturity = 18;
+  else maturity = 12;
+  if (data.category) maturity = Math.min(25, maturity + 3);
+
+  // Exploit History (0-25): inferred from TVL stability and age
+  // Without a direct exploit DB lookup, use TVL drop as proxy
+  let exploitHistory = 20;
+  if (change1d < -20) exploitHistory = 5;
+  else if (change1d < -10) exploitHistory = 10;
+  else if (change1d < -5) exploitHistory = 15;
+
+  const total = tvlStability + verification + maturity + exploitHistory;
+  const riskLabel = total >= 75 ? "Low Risk" : total >= 50 ? "Moderate Risk" : "High Risk";
+
+  return { total, tvlStability, verification, maturity, exploitHistory, riskLabel };
+}
+
 async function fetchProtocolData(name: string): Promise<any | null> {
   try {
     const protocols = await cachedFetch(`${DEFILLAMA_API}/protocols`) as any[];

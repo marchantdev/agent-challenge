@@ -42,10 +42,10 @@
     "On-chain investigation tools: Etherscan, Tenderly, Dune Analytics, Phalcon, Solscan",
     "Solana ecosystem: SPL tokens, Anchor framework, programs vs accounts model, getTokenAccountsByOwner RPC, getSignaturesForAddress",
     "Bridge security: validator sets, optimistic vs ZK proofs, message passing patterns",
-    "10 custom ElizaOS actions: ASSESS_PROTOCOL_RISK, EXPLAIN_VULNERABILITY, SCAN_DEFI_TVL, INSPECT_CONTRACT, EXPLOIT_HISTORY, SCAN_BOUNTIES, AUDIT_RECON, ANALYZE_WALLET, MONITOR_PROTOCOL, NOSANA_STATUS",
-    "Cross-chain support: Ethereum (Etherscan V2, Sourcify, Ethplorer) and Solana (JSON-RPC) address inspection and wallet analysis",
+    "12 custom ElizaOS actions: ASSESS_PROTOCOL_RISK, EXPLAIN_VULNERABILITY, SCAN_DEFI_TVL, INSPECT_CONTRACT, EXPLOIT_HISTORY, SCAN_BOUNTIES, AUDIT_RECON, ANALYZE_WALLET, MONITOR_PROTOCOL, NOSANA_STATUS, COMPARE_PROTOCOLS, GENERATE_AUDIT_REPORT",
+    "Cross-chain support: Ethereum (Etherscan V2, Ethplorer) and Solana (native RPC) address inspection and wallet analysis",
     "Live DeFi TVL data: fetches real-time rankings from DefiLlama API across lending, DEX, yield, and all categories",
-    "Smart contract inspection: on-chain balance, Sourcify source verification, ERC-20 metadata detection, Solana account type derivation",
+    "Smart contract inspection: on-chain balance, Etherscan V2 source verification, ERC-20 metadata detection, Solana account type derivation",
     "Historical DeFi exploits database: Ronin Bridge ($625M), Poly Network ($611M), Wormhole ($326M), Beanstalk ($182M), Euler Finance ($197M), and 470+ others via DeFiLlama Hacks API",
     "Protocol TVL watchlist: MONITOR_PROTOCOL tracks protocols and alerts on >10% TVL drops since first monitoring",
     "Bug bounty intelligence: SCAN_BOUNTIES parses Immunefi sitemap for live programs sorted by recent activity"

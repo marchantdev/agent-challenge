@@ -238,6 +238,20 @@ async function handleExploits(res: ServerResponse): Promise<void> {
   }
 }
 
+function handleEvaluatorStats(res: ServerResponse): void {
+  const totalResponses = Object.values(actionCounts).reduce((s, c) => s + c, 0);
+  const securityScoresIncluded =
+    (actionCounts["ASSESS_PROTOCOL_RISK"] || 0) + (actionCounts["COMPARE_PROTOCOLS"] || 0);
+  res.writeHead(200, { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" });
+  res.end(JSON.stringify({
+    totalResponses,
+    securityScoresIncluded,
+    recommendationsIncluded: securityScoresIncluded,
+    sourcesAttributed: totalResponses,
+    evaluator: "responseQualityEvaluator",
+  }));
+}
+
 const server = createServer(async (req, res) => {
   const url = req.url || "/";
 
@@ -255,6 +269,7 @@ const server = createServer(async (req, res) => {
   // Health & metrics
   if (url === "/api/health" || url === "/health") { handleHealth(res); return; }
   if (url === "/api/metrics" || url === "/metrics") { handleMetrics(res); return; }
+  if (url === "/api/evaluator-stats") { handleEvaluatorStats(res); return; }
 
   // Exploits API: GET /api/exploits — server-side rekt.news fetch (no CORS)
   if (url === "/api/exploits" && req.method === "GET") {

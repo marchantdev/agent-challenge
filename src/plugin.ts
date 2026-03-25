@@ -2,9 +2,10 @@
  * axiom-security-plugin
  * DeFi security intelligence actions for the Axiom agent.
  *
- * 10 actions: protocol risk assessment, vulnerability explanation, TVL scanning,
+ * 12 actions: protocol risk assessment, vulnerability explanation, TVL scanning,
  * contract inspection, exploit history, wallet analysis, bounty scanning,
- * repo recon, Nosana status, protocol watchlist monitoring.
+ * repo recon, Nosana status, protocol watchlist monitoring, protocol comparison,
+ * full audit report generation.
  */
 
 import { type Plugin } from "@elizaos/core";
@@ -18,12 +19,14 @@ import { scanBountiesAction } from "./actions/scanBounties.ts";
 import { auditReconAction } from "./actions/auditRecon.ts";
 import { nosanaStatusAction } from "./actions/nosanaStatus.ts";
 import { monitorProtocolAction } from "./actions/monitorProtocol.ts";
+import { compareProtocolsAction } from "./actions/compareProtocols.ts";
+import { generateAuditReportAction } from "./actions/generateAuditReport.ts";
 import { defiMarketProvider } from "./providers/defiMarketProvider.ts";
 import { responseQualityEvaluator } from "./evaluators/responseQualityEvaluator.ts";
 
 export const axiomPlugin: Plugin = {
   name: "axiom-security-plugin",
-  description: "DeFi Security Operations Center: protocol risk assessment, exploit tracking, contract inspection, TVL monitoring, wallet risk analysis, protocol watchlist monitoring, and Nosana infrastructure awareness.",
+  description: "DeFi Security Operations Center: protocol risk assessment, exploit tracking, contract inspection, TVL monitoring, wallet risk analysis, protocol watchlist monitoring, protocol comparison, full audit report generation, and Nosana infrastructure awareness.",
   actions: [
     assessRiskAction,
     explainVulnAction,
@@ -35,6 +38,8 @@ export const axiomPlugin: Plugin = {
     auditReconAction,
     nosanaStatusAction,
     monitorProtocolAction,
+    compareProtocolsAction,
+    generateAuditReportAction,
   ],
   providers: [defiMarketProvider],
   evaluators: [responseQualityEvaluator],
