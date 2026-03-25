@@ -2,13 +2,20 @@
 
 FROM node:23-slim AS base
 
-# Install system dependencies needed for native modules (e.g. better-sqlite3)
+# Install system dependencies + bun (required by elizaos CLI)
 RUN apt-get update && apt-get install -y \
   python3 \
   make \
   g++ \
   git \
+  curl \
+  unzip \
   && rm -rf /var/lib/apt/lists/*
+
+# Install bun runtime (elizaos uses bun as its JS runtime)
+RUN curl -fsSL https://bun.sh/install | bash
+ENV BUN_INSTALL="/root/.bun"
+ENV PATH="$BUN_INSTALL/bin:$PATH"
 
 # Disable telemetry
 ENV ELIZAOS_TELEMETRY_DISABLED=true
