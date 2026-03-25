@@ -4,7 +4,7 @@
   "plugins": [
     "@elizaos/plugin-bootstrap",
     "@elizaos/plugin-openai",
-    "axiom-defi-intelligence"
+    "./dist/index.js"
   ],
   "clients": [],
   "modelProvider": "openai",

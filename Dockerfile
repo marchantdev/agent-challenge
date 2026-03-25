@@ -26,6 +26,9 @@ RUN pnpm install
 # Copy all source files
 COPY . .
 
+# Build TypeScript plugin to dist/
+RUN pnpm build
+
 # Create data directory for SQLite
 RUN mkdir -p /app/data
 
