@@ -118,6 +118,61 @@ function handleHealth(res: ServerResponse): void {
   }));
 }
 
+async function handleSecurityScoreBadge(res: ServerResponse, protocol: string): Promise<void> {
+  try {
+    const protocols = (await cachedFetch("https://api.llama.fi/protocols")) as any[];
+    const match = protocols.find(
+      (p: any) =>
+        p.name.toLowerCase() === protocol.toLowerCase() ||
+        p.slug.toLowerCase() === protocol.toLowerCase()
+    );
+
+    let score = 0;
+    let label = "Unknown";
+    if (match) {
+      const s = await computeSecurityScore(match);
+      score = s.total;
+      label = `${score}/100`;
+    }
+
+    const color = score >= 80 ? "#44cc11" : score >= 60 ? "#dfb317" : score >= 40 ? "#fe7d37" : "#e05d44";
+    const leftW = 112;
+    const rightW = 66;
+    const totalW = leftW + rightW;
+    const h = 20;
+
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${totalW}" height="${h}" role="img" aria-label="Security Score: ${label}">
+  <title>Security Score: ${label}</title>
+  <linearGradient id="s" x2="0" y2="100%">
+    <stop offset="0" stop-color="#bbb" stop-opacity=".1"/>
+    <stop offset="1" stop-opacity=".1"/>
+  </linearGradient>
+  <clipPath id="r"><rect width="${totalW}" height="${h}" rx="3" fill="#fff"/></clipPath>
+  <g clip-path="url(#r)">
+    <rect width="${leftW}" height="${h}" fill="#555"/>
+    <rect x="${leftW}" width="${rightW}" height="${h}" fill="${color}"/>
+    <rect width="${totalW}" height="${h}" fill="url(#s)"/>
+  </g>
+  <g fill="#fff" text-anchor="middle" font-family="DejaVu Sans,Verdana,Geneva,sans-serif" font-size="11">
+    <text x="${Math.floor(leftW / 2) + 1}" y="15" fill="#010101" fill-opacity=".3">${match ? "Security Score" : protocol}</text>
+    <text x="${Math.floor(leftW / 2)}" y="14">${match ? "Security Score" : protocol}</text>
+    <text x="${leftW + Math.floor(rightW / 2) + 1}" y="15" fill="#010101" fill-opacity=".3">${label}</text>
+    <text x="${leftW + Math.floor(rightW / 2)}" y="14">${label}</text>
+  </g>
+</svg>`;
+
+    res.writeHead(200, {
+      "Content-Type": "image/svg+xml",
+      "Cache-Control": "no-cache, max-age=3600",
+      "Access-Control-Allow-Origin": "*",
+    });
+    res.end(svg);
+  } catch (err: any) {
+    res.writeHead(500, { "Content-Type": "text/plain" });
+    res.end("Error generating badge");
+  }
+}
+
 async function handleSecurityScore(res: ServerResponse, protocol: string): Promise<void> {
   try {
     const protocols = (await cachedFetch("https://api.llama.fi/protocols")) as any[];
@@ -207,8 +262,15 @@ const server = createServer(async (req, res) => {
     return;
   }
 
+  // Security Score Badge: GET /api/security-score/:protocol/badge
+  const badgeMatch = url.match(/^\/api\/security-score\/([^/?]+)\/badge$/);
+  if (badgeMatch && req.method === "GET") {
+    await handleSecurityScoreBadge(res, decodeURIComponent(badgeMatch[1]));
+    return;
+  }
+
   // Security Score API: GET /api/security-score/:protocol
-  const secScoreMatch = url.match(/^\/api\/security-score\/([^/?]+)/);
+  const secScoreMatch = url.match(/^\/api\/security-score\/([^/?]+)$/);
   if (secScoreMatch && req.method === "GET") {
     await handleSecurityScore(res, decodeURIComponent(secScoreMatch[1]));
     return;

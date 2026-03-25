@@ -200,6 +200,28 @@ curl http://your-axiom-deployment/api/security-score/aave
 
 **Score Labels:** 🟢 Low Risk (80–100) · 🟡 Moderate (60–79) · 🟠 Elevated (40–59) · 🔴 High Risk (0–39)
 
+### Badge Endpoint
+
+Embed a live security score badge in any README or dashboard:
+
+```
+GET /api/security-score/:protocol/badge
+```
+
+Returns a `shields.io`-style SVG badge with the protocol's real-time security score.
+
+**Example:**
+```bash
+curl http://your-axiom-deployment/api/security-score/aave/badge
+```
+
+**Embed in a README:**
+```markdown
+![Aave Security Score](https://your-axiom-url/api/security-score/aave/badge)
+```
+
+The badge right-hand color reflects the score band: green (≥80), amber (≥60), orange (≥40), red (<40).
+
 This endpoint enables Axiom to act as infrastructure that other agents can query for protocol safety data.
 
 ---
