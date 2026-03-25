@@ -107,7 +107,7 @@ export async function getErc20TotalSupply(address: string): Promise<bigint | nul
 
 // ─── Contract verification via Etherscan V2 ──────────────────────────────────
 
-export async function checkSourcifyVerification(address: string): Promise<"verified" | "partial" | "unverified"> {
+export async function checkContractVerification(address: string): Promise<"verified" | "partial" | "unverified"> {
   try {
     const data = await etherscanV2({ module: "contract", action: "getsourcecode", address });
     if (data.status !== "1" || !Array.isArray(data.result) || data.result.length === 0) return "unverified";

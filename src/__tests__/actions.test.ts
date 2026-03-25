@@ -177,7 +177,7 @@ describe("Formatting utilities", () => {
   });
 
   it("extractEthAddress extracts valid addresses", async () => {
-    const { extractEthAddress } = await import("../utils/api.ts");
+    const { extractEthAddress } = await import("../utils/addressDetect.ts");
     expect(extractEthAddress("Inspect 0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D")).toBe("0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D");
     expect(extractEthAddress("no address here")).toBeNull();
   });

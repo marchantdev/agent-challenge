@@ -41,7 +41,3 @@ export function extractProtocolName(text: string): string {
     : text.replace(/\b(assess|risk|analyze|protocol|the|of|how|is|safe|secure|security|check|about|tell|me)\b/gi, "").trim();
 }
 
-export function extractEthAddress(text: string): string | null {
-  const match = text.match(/0x[a-fA-F0-9]{40}/);
-  return match ? match[0] : null;
-}

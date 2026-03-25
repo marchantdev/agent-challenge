@@ -5,9 +5,9 @@
  * Supports both Ethereum (0x…) and Solana (base58) addresses — auto-detected.
  *
  * Ethereum flow:
- *   1. Fetches ETH balance, bytecode presence, ERC-20 name/symbol, and Sourcify
+ *   1. Fetches ETH balance, bytecode presence, ERC-20 name/symbol, and contract
  *      verification status in parallel via {@link getEthBalance}, {@link isEthContract},
- *      {@link getErc20Name}, {@link getErc20Symbol}, {@link checkSourcifyVerification}.
+ *      {@link getErc20Name}, {@link getErc20Symbol}, {@link checkContractVerification}.
  *   2. Builds a structured flag list (unverified source, ERC-20 type, EOA detection).
  *   3. Calls `runtime.useModel` (Qwen3.5-27B via Nosana) for a 3–4 sentence expert
  *      assessment of the address type and security implications.
@@ -20,7 +20,7 @@
  *   3. Calls `runtime.useModel` (Qwen3.5-27B via Nosana) for a 3–4 sentence
  *      Solana-specific assessment.
  *
- * Data sources: Sourcify API (ETH verification), Ethplorer/ethRpc utils (ETH balance),
+ * Data sources: Etherscan V2 API (ETH verification), Ethplorer/ethRpc utils (ETH balance),
  * Solana JSON-RPC (account data), Nosana-hosted Qwen LLM (AI commentary).
  *
  * @module inspectContract
@@ -29,27 +29,9 @@
 import { ModelType } from "@elizaos/core";
 import type { Action, IAgentRuntime, Memory, State, HandlerCallback, HandlerOptions } from "@elizaos/core";
 
-import { getEthBalance, isEthContract, getErc20Name, getErc20Symbol, checkSourcifyVerification } from "../utils/ethRpc.js";
+import { getEthBalance, isEthContract, getErc20Name, getErc20Symbol, checkContractVerification } from "../utils/ethRpc.js";
 import { solanaRpc, deriveAccountType } from "../utils/solanaRpc.js";
-
-// ─── Address detection ────────────────────────────────────────────────────────
-
-function isSolanaAddress(s: string): boolean {
-  // base58, 32–44 chars, no 0x prefix
-  return /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(s);
-}
-
-function extractEthAddress(text: string): string | null {
-  const m = text.match(/0x[a-fA-F0-9]{40}/);
-  return m ? m[0] : null;
-}
-
-function extractSolanaAddress(text: string): string | null {
-  // Match standalone base58 token of 32-44 chars
-  const m = text.match(/\b([1-9A-HJ-NP-Za-km-z]{32,44})\b/);
-  if (m && isSolanaAddress(m[1])) return m[1];
-  return null;
-}
+import { extractEthAddress, extractSolanaAddress } from "../utils/addressDetect.js";
 
 // ─── Solana RPC helpers ───────────────────────────────────────────────────────
 
@@ -84,7 +66,7 @@ async function handleEthContract(
     isEthContract(address),
     getErc20Name(address),
     getErc20Symbol(address),
-    checkSourcifyVerification(address),
+    checkContractVerification(address),
   ]);
 
   const balance = ethBalance.status === "fulfilled" ? ethBalance.value : 0;
@@ -101,9 +83,9 @@ async function handleEthContract(
   if (!isContract) {
     flags.push("**INFO:** This is an externally owned account (EOA), not a smart contract");
   } else {
-    if (!verified) flags.push("**WARNING:** Source code NOT verified on Sourcify");
-    if (verif === "partial") flags.push("**INFO:** Partially verified on Sourcify (metadata may differ)");
-    if (verified && verif === "verified") flags.push("**OK:** Fully verified on Sourcify");
+    if (!verified) flags.push("**WARNING:** Source code NOT verified on Etherscan");
+    if (verif === "partial") flags.push("**INFO:** Partially verified on Etherscan (metadata may differ)");
+    if (verified && verif === "verified") flags.push("**OK:** Fully verified on Etherscan");
     if (tokenName && tokenSymbol) flags.push(`**INFO:** ERC-20 token — ${tokenName} (${tokenSymbol})`);
   }
 
@@ -126,7 +108,7 @@ async function handleEthContract(
     `| Type | ${isContract ? "Smart Contract" : "EOA (Wallet)"} |`,
     tokenSymbol ? `| Token | ${tokenName} (${tokenSymbol}) |` : "",
     `| ETH Balance | ${ethBalance_str} ETH |`,
-    `| Verified | ${verif === "verified" ? "Yes (Sourcify)" : verif === "partial" ? "Partial (Sourcify)" : "No"} |`,
+    `| Verified | ${verif === "verified" ? "Yes (Etherscan V2)" : verif === "partial" ? "Partial (Etherscan V2)" : "No"} |`,
     ``,
     `### Risk Flags`,
     flags.map((f, i) => `${i + 1}. ${f}`).join("\n"),

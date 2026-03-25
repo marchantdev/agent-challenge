@@ -8,7 +8,7 @@
 
 ## Demo
 
-> **Demo Video:** [Watch on YouTube / Loom](https://your-demo-link-here) <!-- TODO: replace with actual link -->
+> **Demo Video:** Coming soon — deployment in progress
 
 ### Screenshots
 
@@ -74,7 +74,7 @@
 | `ASSESS_PROTOCOL_RISK` | DefiLlama API + Qwen LLM | Real-time 5-category risk assessment with live TVL, volatility, and AI-generated expert commentary |
 | `EXPLAIN_VULNERABILITY` | DeFiLlama Hacks API + Qwen LLM | Explains reentrancy, flash loans, oracle manipulation, bridge exploits — with real verified examples and Solidity code patterns |
 | `SCAN_DEFI_TVL` | DefiLlama API | Live TVL rankings across all chains/categories with anomaly detection and 24h/7d change |
-| `INSPECT_CONTRACT` | Etherscan V2 + Solana RPC + Sourcify + Qwen LLM | Inspects Ethereum contracts (balance, verification, ERC-20 metadata) and Solana accounts (type, owner program, recent txs) |
+| `INSPECT_CONTRACT` | Etherscan V2 + Solana RPC + Qwen LLM | Inspects Ethereum contracts (balance, verification, ERC-20 metadata) and Solana accounts (type, owner program, recent txs) |
 | `EXPLOIT_HISTORY` | DeFiLlama Hacks API (478+ records) | Live exploit database — 1h cache, filters by chain/category/technique/year |
 | `SCAN_BOUNTIES` | Immunefi Sitemap API | Live bug bounty program scanner sorted by most recent activity |
 | `AUDIT_RECON` | GitHub API | Recent commits, audit-file indicators, repo stars and language for any GitHub repository |
@@ -86,7 +86,7 @@
 
 Axiom operates across **Ethereum** and **Solana** natively:
 
-- **Ethereum** — Contract inspection via Sourcify/Etherscan V2, ERC-20 metadata, ETH wallet analysis via Ethplorer
+- **Ethereum** — Contract inspection via Etherscan V2, ERC-20 metadata, ETH wallet analysis via Ethplorer
 - **Solana** — Account inspection via Solana JSON-RPC (`getAccountInfo`, `getSignaturesForAddress`), SPL token holdings via `getTokenAccountsByOwner`, SOL balance
 - **Multi-chain TVL** — DefiLlama data covers Ethereum, Solana, Arbitrum, Base, Polygon, Avalanche, BSC and 50+ chains
 
@@ -96,7 +96,7 @@ Axiom operates across **Ethereum** and **Solana** natively:
 |--------|---------|
 | **DefiLlama API** (`api.llama.fi`) | TVL rankings, protocol metadata, exploit history, protocol watchlist |
 | **Etherscan V2 / Ethplorer** | ETH wallet balances, ERC-20 token data |
-| **Sourcify** | Smart contract source verification status |
+| **Etherscan V2** | Smart contract source verification status |
 | **Solana JSON-RPC** | SOL balances, SPL tokens, Solana account inspection |
 | **GitHub API** | Repo commits, audit file detection, security posture |
 | **CoinGecko API** | NOS token price and market cap |
@@ -230,7 +230,7 @@ Axiom runs on Nosana's decentralized GPU network — a Solana-based compute mark
 | Frontend | React 19 + Vite 6 + TypeScript + Tailwind CSS |
 | Compute | Nosana decentralized GPU (RTX 3090) |
 | Nosana SDK | `@nosana/sdk` for on-chain node/job queries |
-| APIs | DefiLlama, DeFiLlama Hacks, Etherscan V2, Sourcify, Solana RPC, CoinGecko, GitHub, Immunefi |
+| APIs | DefiLlama, DeFiLlama Hacks, Etherscan V2, Solana RPC, CoinGecko, GitHub, Immunefi |
 | Container | Docker (multi-stage build) |
 | CI/CD | GitHub Actions |
 

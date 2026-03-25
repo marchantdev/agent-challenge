@@ -168,10 +168,10 @@ export async function fetchNosanaNetwork(): Promise<NosanaNetwork> {
     };
   } catch {
     return {
-      totalNodes: 847,
-      activeJobs: 312,
-      gpuTypes: ["RTX 4090", "RTX 3090", "RTX 3080", "A100", "H100"],
-      networkVersion: "1.0",
+      totalNodes: 0,
+      activeJobs: 0,
+      gpuTypes: [],
+      networkVersion: "unavailable",
     };
   }
 }

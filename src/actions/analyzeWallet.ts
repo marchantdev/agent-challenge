@@ -30,22 +30,7 @@ interface ProtocolInfo {
   chains: string[];
 }
 
-// ─── Address detection ────────────────────────────────────────────────────────
-
-function isSolanaAddress(s: string): boolean {
-  return /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(s);
-}
-
-function extractEthAddress(text: string): string | null {
-  const m = text.match(/0x[a-fA-F0-9]{40}/);
-  return m ? m[0] : null;
-}
-
-function extractSolanaAddress(text: string): string | null {
-  const m = text.match(/\b([1-9A-HJ-NP-Za-km-z]{32,44})\b/);
-  if (m && isSolanaAddress(m[1])) return m[1];
-  return null;
-}
+import { extractEthAddress, extractSolanaAddress } from "../utils/addressDetect.js";
 
 // ─── Shared utilities ─────────────────────────────────────────────────────────
 
