@@ -1,4 +1,4 @@
-import type { Protocol, Exploit, NosanaHealth, NosanaMetrics, NosanaNetwork, ContractInfo } from "./types";
+import type { Protocol, Exploit, NosanaHealth, NosanaMetrics, NosanaNetwork, ContractInfo, EvaluatorStats } from "./types";
 
 const DEFILLAMA_BASE = "https://api.llama.fi";
 const AGENT_BASE = "/api"; // proxied to ElizaOS
@@ -146,6 +146,24 @@ export async function fetchMetrics(): Promise<NosanaMetrics> {
       avgResponseTimeMs: 0,
       errorRate: 0,
       protocolsMonitored: 0,
+    };
+  }
+}
+
+// --- Evaluator Stats ---
+
+export async function fetchEvaluatorStats(): Promise<EvaluatorStats> {
+  try {
+    const res = await fetch(`${AGENT_BASE}/evaluator-stats`);
+    if (!res.ok) throw new Error("Evaluator stats fetch failed");
+    return await res.json();
+  } catch {
+    return {
+      totalResponses: 0,
+      securityScoresIncluded: 0,
+      recommendationsIncluded: 0,
+      sourcesAttributed: 0,
+      evaluator: "responseQualityEvaluator",
     };
   }
 }

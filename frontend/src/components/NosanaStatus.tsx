@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
-import type { NosanaHealth, NosanaMetrics, NosanaNetwork } from "../lib/types";
-import { fetchHealth, fetchMetrics, fetchNosanaNetwork, formatNumber } from "../lib/api";
+import type { NosanaHealth, NosanaMetrics, NosanaNetwork, EvaluatorStats } from "../lib/types";
+import { fetchHealth, fetchMetrics, fetchNosanaNetwork, fetchEvaluatorStats, formatNumber } from "../lib/api";
 
 function formatUptime(secs: number): string {
   const d = Math.floor(secs / 86400);
@@ -40,6 +40,7 @@ export default function NosanaStatus() {
   const [health, setHealth] = useState<NosanaHealth | null>(null);
   const [metrics, setMetrics] = useState<NosanaMetrics | null>(null);
   const [network, setNetwork] = useState<NosanaNetwork | null>(null);
+  const [evaluatorStats, setEvaluatorStats] = useState<EvaluatorStats | null>(null);
   const [refreshing, setRefreshing] = useState(false);
 
   const loadData = () => {
@@ -48,6 +49,7 @@ export default function NosanaStatus() {
       fetchHealth().then(setHealth),
       fetchMetrics().then(setMetrics),
       fetchNosanaNetwork().then(setNetwork),
+      fetchEvaluatorStats().then(setEvaluatorStats),
     ]).finally(() => setRefreshing(false));
   };
 
@@ -187,6 +189,42 @@ export default function NosanaStatus() {
             </div>
           </div>
         )}
+      </div>
+
+      {/* Agent Intelligence */}
+      <div className="card border-cyan-800/30 bg-cyan-950/5">
+        <div className="flex items-center gap-2 mb-4">
+          <span className="inline-block w-2 h-2 rounded-full bg-cyan-400 animate-pulse" />
+          <h3 className="font-medium text-cyan-400">Agent Intelligence</h3>
+          <span className="badge text-xs bg-cyan-900/40 text-cyan-300 border border-cyan-700/40 ml-auto">
+            {evaluatorStats?.evaluator || "responseQualityEvaluator"}
+          </span>
+        </div>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+          <MetricCard
+            label="Total Assessments"
+            value={evaluatorStats ? formatNumber(evaluatorStats.totalResponses) : "—"}
+            accent="text-cyan-400"
+          />
+          <MetricCard
+            label="Security Scores"
+            value={evaluatorStats ? formatNumber(evaluatorStats.securityScoresIncluded) : "—"}
+            accent="text-cyan-400"
+          />
+          <MetricCard
+            label="Recommendations"
+            value={evaluatorStats ? formatNumber(evaluatorStats.recommendationsIncluded) : "—"}
+            accent="text-cyan-400"
+          />
+          <MetricCard
+            label="Sources Attributed"
+            value={evaluatorStats ? formatNumber(evaluatorStats.sourcesAttributed) : "—"}
+            accent="text-cyan-400"
+          />
+        </div>
+        <p className="text-xs text-zinc-500">
+          Response quality is continuously monitored by <span className="font-mono text-cyan-500">responseQualityEvaluator</span> — verifying that every answer includes structured security scores, risk recommendations, and attributed sources.
+        </p>
       </div>
 
       {/* Why Decentralized */}
