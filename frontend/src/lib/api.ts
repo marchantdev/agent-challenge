@@ -177,54 +177,19 @@ export async function fetchExploitsLive(): Promise<Exploit[]> {
     return exploitCache.data;
   }
 
-  // 1. Primary: rekt.news (287 entries, free — may be blocked by CORS in browser)
+  // 1. Primary: /api/exploits — our own backend proxies rekt.news (no CORS)
   try {
-    const data = await tryFetchRektNews();
+    const res = await fetch("/api/exploits");
+    if (!res.ok) throw new Error(`/api/exploits returned ${res.status}`);
+    const data = await res.json() as Exploit[];
+    if (!Array.isArray(data) || data.length === 0) throw new Error("Empty response");
     exploitCache = { data, ts: Date.now() };
     return data;
   } catch {
-    // CORS or network error — fall through
+    // backend unavailable — fall through to static
   }
 
-  // 2. Fallback: DeFiLlama /hacks
-  try {
-    const res = await fetch(`${DEFILLAMA_BASE}/hacks`);
-    if (!res.ok) throw new Error("Failed to fetch exploit data");
-
-    const text = await res.text();
-    // Paywall detection: valid response is a JSON array starting with '['
-    if (!text.trimStart().startsWith("[")) {
-      throw new Error("API returned non-array response (possible paywall)");
-    }
-
-    const raw = JSON.parse(text) as any[];
-    if (!Array.isArray(raw) || raw.length === 0) {
-      throw new Error("API returned empty data");
-    }
-
-    const data: Exploit[] = raw
-      .map((h) => ({
-        name: (h.name || "Unknown Protocol") as string,
-        date: h.date
-          ? new Date((h.date as number) * 1000).toISOString().split("T")[0]
-          : "Unknown",
-        amount: (h.amount ?? h.funds_lost ?? 0) as number,
-        chain:
-          Array.isArray(h.chains) && h.chains.length > 0
-            ? (h.chains[0] as string)
-            : ((h.chain as string | undefined) ?? "Unknown"),
-        technique: ((h.technique ?? h.category ?? "Unknown") as string),
-      }))
-      .filter((e) => e.amount > 0)
-      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
-      .slice(0, 50);
-    exploitCache = { data, ts: Date.now() };
-    return data;
-  } catch {
-    // fall through to last resort
-  }
-
-  // 3. Last resort: static curated dataset
+  // 2. Last resort: static curated dataset
   const fallback = [...KNOWN_EXPLOITS].sort(
     (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
   );

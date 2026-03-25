@@ -13,6 +13,7 @@ import { fileURLToPath } from "node:url";
 import { logger } from "@elizaos/core";
 import { computeSecurityScore } from "./actions/assessRisk.ts";
 import { cachedFetch } from "./utils/api.ts";
+import { fetchRektExploits } from "./utils/rektFetch.ts";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -167,6 +168,21 @@ function handleMetrics(res: ServerResponse): void {
   }));
 }
 
+async function handleExploits(res: ServerResponse): Promise<void> {
+  try {
+    const data = await fetchRektExploits();
+    res.writeHead(200, {
+      "Content-Type": "application/json",
+      "Access-Control-Allow-Origin": "*",
+      "Cache-Control": "public, max-age=3600",
+    });
+    res.end(JSON.stringify(data));
+  } catch (err: any) {
+    res.writeHead(500, { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" });
+    res.end(JSON.stringify({ error: err.message || "Failed to fetch exploits" }));
+  }
+}
+
 const server = createServer(async (req, res) => {
   const url = req.url || "/";
 
@@ -184,6 +200,12 @@ const server = createServer(async (req, res) => {
   // Health & metrics
   if (url === "/api/health" || url === "/health") { handleHealth(res); return; }
   if (url === "/api/metrics" || url === "/metrics") { handleMetrics(res); return; }
+
+  // Exploits API: GET /api/exploits — server-side rekt.news fetch (no CORS)
+  if (url === "/api/exploits" && req.method === "GET") {
+    await handleExploits(res);
+    return;
+  }
 
   // Security Score API: GET /api/security-score/:protocol
   const secScoreMatch = url.match(/^\/api\/security-score\/([^/?]+)/);
