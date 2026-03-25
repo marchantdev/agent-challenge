@@ -186,7 +186,7 @@ const vulnExplainerAction = {
 export const customPlugin: Plugin = {
   name: "axiom-defi-intelligence",
   description: "DeFi security analysis — protocol risk assessment and smart contract vulnerability explanation",
-  actions: [protocolRiskAction, vulnExplainerAction],
+  actions: [protocolRiskAction as any, vulnExplainerAction as any],
   providers: [],
   evaluators: [],
 };
