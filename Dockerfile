@@ -42,9 +42,6 @@ RUN pnpm install
 # Copy all source files
 COPY . .
 
-# Build TypeScript plugin to dist/
-RUN pnpm build
-
 # Copy frontend build output
 COPY --from=frontend-build /frontend/dist /app/frontend/dist
 

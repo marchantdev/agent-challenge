@@ -16,6 +16,7 @@
   },
   "devDependencies": {
     "@elizaos/cli": "^1.0.0",
+    "@types/node": "^22.0.0",
     "typescript": "^5.0.0"
   }
 }

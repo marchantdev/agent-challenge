@@ -6,11 +6,14 @@
  * Proxies agent API calls to ElizaOS on port 3000.
  */
 
-import { createServer, type IncomingMessage, type ServerResponse } from "http";
-import { readFile, stat } from "fs/promises";
-import { join, extname } from "path";
+import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
+import { readFile, stat } from "node:fs/promises";
+import { join, extname, dirname } from "node:path";
+import { fileURLToPath } from "node:url";
 
-const FRONTEND_DIR = join(import.meta.dirname || __dirname, "..", "frontend", "dist");
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+const FRONTEND_DIR = join(__dirname, "..", "frontend", "dist");
 const PORT = parseInt(process.env.FRONTEND_PORT || "8080");
 const AGENT_PORT = parseInt(process.env.SERVER_PORT || "3000");
 
