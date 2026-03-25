@@ -43,13 +43,21 @@ Triggered when you ask Axiom to audit or assess a protocol. Provides a structure
 5. Upgrade risk (proxy pattern vulnerabilities)
 
 ### `EXPLAIN_VULNERABILITY`
-Deep explanations of smart contract vulnerability patterns with real exploit examples and code-level mitigations. Currently covers reentrancy and flash loan attacks with detailed Solidity examples.
+Deep explanations of smart contract vulnerability patterns with real exploit examples and code-level mitigations. Covers 7 vulnerability classes:
+- **Reentrancy** (including cross-function, cross-contract, and read-only variants)
+- **Flash loan attacks** (with real examples: Mango Markets, Beanstalk, Harvest)
+- **Oracle manipulation** (AMM spot price, Chainlink staleness, sequencer downtime)
+- **Access control failures** (missing modifiers, re-initialisation, two-step ownership)
+- **Integer overflow/underflow** (unchecked blocks, unsafe casting, rounding direction)
+- **MEV / sandwich attacks** (front-running, governance attacks, JIT liquidity)
+- **Storage collision** (proxy patterns, UUPS vs Transparent, initialisation attacks)
 
 ---
 
 ## Deployment
 
 **Docker Image:** `ghcr.io/marchantdev/agent-challenge:latest`
+**Live Deployment:** `https://4ZNsog5Cb8GMrqcVAbCGbn4cMhVwj92CkdqUdQ4KG7T1.node.k8s.prd.nos.ci`
 
 **Nosana Job Definition:** See `nos_job_def/nosana_eliza_job_definition.json`
 
@@ -63,8 +71,8 @@ Deep explanations of smart contract vulnerability patterns with real exploit exa
 # 2. Deploy the agent
 nosana job post \
   --file ./nos_job_def/nosana_eliza_job_definition.json \
-  --market nvidia-3090 \
-  --timeout 300
+  --market nvidia-3090-community \
+  --timeout 60
 
 # 3. Get your deployment URL from the job output
 ```
