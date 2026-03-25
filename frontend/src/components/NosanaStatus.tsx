@@ -99,7 +99,7 @@ export default function NosanaStatus() {
             ["Node ID", health?.nosanaNode || "\u2014", true],
             ["GPU Market", "NVIDIA RTX 3090", false],
             ["Container", "ghcr.io/marchantdev/agent-challenge:latest", true],
-            ["Framework", "ElizaOS v1 + Custom Plugin", false],
+            ["Framework", "ElizaOS v2 + Custom Plugin", false],
             ["Ports", "3000 (Agent) / 8080 (Frontend)", true],
             ["Last Heartbeat", health?.lastHeartbeat ? new Date(health.lastHeartbeat).toLocaleString() : "\u2014", true],
           ].map(([label, value, mono]) => (

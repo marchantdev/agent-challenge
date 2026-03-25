@@ -158,7 +158,7 @@ export const nosanaStatusAction: Action = {
       `| RSS Memory | ${rssMB} MB |`,
       `| Container | \`ghcr.io/marchantdev/agent-challenge:latest\` |`,
       `| Frontend | Custom React Dashboard (port 8080) |`,
-      `| Framework | ElizaOS v1 + Custom Security Plugin |`,
+      `| Framework | ElizaOS v2 + Custom Security Plugin |`,
       ``,
       `### Nosana Network`,
       `| Metric | Value |`,

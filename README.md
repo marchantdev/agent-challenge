@@ -316,7 +316,7 @@ Axiom runs on Nosana's decentralized GPU network — a Solana-based compute mark
 
 | Layer | Technology |
 |-------|-----------|
-| Agent Framework | ElizaOS v1 |
+| Agent Framework | ElizaOS v2 |
 | LLM | Qwen3.5-27B-AWQ-4bit (via Nosana GPU) |
 | Frontend | React 19 + Vite 6 + TypeScript + Tailwind CSS |
 | Compute | Nosana decentralized GPU (RTX 3090) |
