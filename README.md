@@ -32,7 +32,7 @@ Running Axiom on Nosana's decentralised GPU network demonstrates something impor
 
 ## Custom Plugin: Axiom DeFi Intelligence
 
-Beyond the base ElizaOS chat functionality, Axiom includes two custom actions:
+Beyond the base ElizaOS chat functionality, Axiom includes **5 custom actions**:
 
 ### `ASSESS_PROTOCOL_RISK`
 Triggered when you ask Axiom to audit or assess a protocol. Provides a structured 5-point framework:
@@ -52,12 +52,21 @@ Deep explanations of smart contract vulnerability patterns with real exploit exa
 - **MEV / sandwich attacks** (front-running, governance attacks, JIT liquidity)
 - **Storage collision** (proxy patterns, UUPS vs Transparent, initialisation attacks)
 
+### `SCAN_DEFI_TVL` *(NEW)*
+Fetches live TVL rankings from DefiLlama API. Supports category filters: lending, DEX/AMM, yield, or all. Shows top 10 protocols with 24h change data.
+
+### `INSPECT_CONTRACT` *(NEW)*
+Inspects any Ethereum contract address — fetches balance, transaction count, and verified source code status via Etherscan. Triggered by any 0x address in the message.
+
+### `EXPLOIT_HISTORY` *(NEW)*
+Curated database of major DeFi hacks with attack vectors, amounts lost, and chain. Supports filtering by chain (Solana, BSC, Ethereum) or keyword. Covers 12+ major incidents from The DAO (2016) to Ronin Bridge (2022).
+
 ---
 
 ## Deployment
 
 **Docker Image:** `ghcr.io/marchantdev/agent-challenge:latest`
-**Live Deployment:** `https://Q8pu8GsXGq23MWAXTaPzV4Vd1PYNWbTPF9G9BspgvNXS.node.k8s.prd.nos.ci`
+**Live Deployment:** `https://4HXAjRna3oV9FCinnT1uTrRm74Qri8spbLT54dced3rz.node.k8s.prd.nos.ci`
 
 **Nosana Job Definition:** See `nos_job_def/nosana_eliza_job_definition.json`
 
