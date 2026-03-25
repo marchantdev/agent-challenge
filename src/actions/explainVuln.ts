@@ -1,142 +1,144 @@
 /**
  * EXPLAIN_VULNERABILITY
- * Explains DeFi vulnerability types with real-world exploit examples.
+ * Uses generateText() (Qwen via Nosana) to generate contextual DeFi vulnerability
+ * explanations with real recent examples from DeFiLlama hacks data.
  */
 
+import { generateText, ModelClass } from "@elizaos/core";
 import type { Action, IAgentRuntime, Memory, State, HandlerCallback, HandlerOptions } from "@elizaos/core";
 
-interface VulnInfo {
-  type: string;
-  description: string;
-  realExamples: { name: string; amount: string; date: string; detail: string }[];
-  mitigation: string[];
-  codeExample?: string;
+interface Exploit {
+  name: string;
+  date: string;
+  amount: number;
+  technique: string;
 }
 
-const VULN_DATABASE: Record<string, VulnInfo> = {
-  reentrancy: {
-    type: "Reentrancy Attack",
-    description: "An attacker exploits a contract that makes an external call before updating its state, allowing recursive re-entry to drain funds.",
-    realExamples: [
-      { name: "The DAO", amount: "$60M", date: "2016-06-17", detail: "Classic reentrancy via recursive fallback in withdrawal function." },
-      { name: "Curve Finance", amount: "$73.5M", date: "2023-07-30", detail: "Vyper compiler bug caused reentrancy locks to fail in pools using affected versions." },
-      { name: "Cream Finance", amount: "$130M", date: "2021-10-27", detail: "Flash loan reentrancy through token callbacks during collateral calculation." },
-    ],
-    mitigation: [
-      "Use checks-effects-interactions pattern (update state BEFORE external calls)",
-      "Implement reentrancy guards (OpenZeppelin ReentrancyGuard)",
-      "Avoid `call.value()` — use `transfer()` or `send()` for simple ETH transfers",
-      "Audit all callback hooks (ERC-777, ERC-1155, flash loans) for re-entry vectors",
-    ],
-  },
-  "flash loan": {
-    type: "Flash Loan Attack",
-    description: "Attacker borrows a massive amount with zero collateral in a single transaction to manipulate prices, governance, or protocol state.",
-    realExamples: [
-      { name: "Beanstalk", amount: "$182M", date: "2022-04-17", detail: "Flash loan used to acquire governance tokens, pass malicious proposal, and drain treasury in one tx." },
-      { name: "Euler Finance", amount: "$197M", date: "2023-03-13", detail: "Flash loan + donation attack bypassed health factor checks." },
-      { name: "Pancake Bunny", amount: "$45M", date: "2021-05-19", detail: "Flash loan price manipulation in AMM pools inflated reward calculations." },
-    ],
-    mitigation: [
-      "Use TWAP oracles instead of spot prices for any financial calculation",
-      "Add cooldown periods between deposit and governance actions",
-      "Check for flash loan indicators: same-block borrow + repay",
-      "Ensure invariants hold even with extreme token amounts",
-    ],
-  },
-  oracle: {
-    type: "Oracle Manipulation",
-    description: "Attacker manipulates price feeds — either by exploiting spot prices or compromising oracle infrastructure — to profit from incorrect valuations.",
-    realExamples: [
-      { name: "Mango Markets", amount: "$114M", date: "2022-10-11", detail: "Manipulated MNGO token price on thin DEX liquidity, used inflated collateral to borrow all protocol assets." },
-      { name: "Cream Finance v1", amount: "$37.5M", date: "2021-10-27", detail: "Manipulated price of yUSD through composable DeFi positions." },
-    ],
-    mitigation: [
-      "Never use spot AMM prices for collateral valuation",
-      "Use Chainlink or other decentralized oracle networks with TWAP",
-      "Implement price deviation checks (reject >X% change per block)",
-      "Use multiple oracle sources and take the median",
-    ],
-  },
-  bridge: {
-    type: "Bridge Exploit",
-    description: "Cross-chain bridges are high-value targets. Exploits typically involve signature verification bypass, validator compromise, or relay message forgery.",
-    realExamples: [
-      { name: "Ronin Bridge", amount: "$625M", date: "2022-03-23", detail: "5 of 9 validator keys compromised (4 from Sky Mavis + 1 from Axie DAO)." },
-      { name: "Wormhole", amount: "$326M", date: "2022-02-02", detail: "Signature verification bypass: attacker forged guardian signatures to mint 120K wETH." },
-      { name: "Nomad Bridge", amount: "$190M", date: "2022-08-01", detail: "Initialization bug set trusted root to 0x00, allowing anyone to prove arbitrary messages." },
-    ],
-    mitigation: [
-      "Require supermajority (>2/3) of validators for message verification",
-      "Implement fraud proofs and challenge periods for large transfers",
-      "Rotate validator keys regularly and use HSMs",
-      "Rate-limit bridge transfers and implement circuit breakers",
-    ],
-  },
-  "access control": {
-    type: "Access Control Vulnerability",
-    description: "Missing or incorrect permission checks allow unauthorized users to call privileged functions, potentially draining funds or modifying critical state.",
-    realExamples: [
-      { name: "Poly Network", amount: "$611M", date: "2021-08-10", detail: "Cross-chain relay allowed attacker to overwrite contract keeper address, gaining control of all funds." },
-      { name: "Wintermute", amount: "$160M", date: "2022-09-20", detail: "Profanity-generated vanity address had weak private key, allowing attacker to drain DeFi vault." },
-    ],
-    mitigation: [
-      "Use OpenZeppelin AccessControl or Ownable for all admin functions",
-      "Implement multi-sig for high-value operations",
-      "Never use tx.origin for authentication (use msg.sender)",
-      "Audit ALL external/public functions for missing access checks",
-    ],
-  },
+// Cache hacks data for 1 hour
+let hacksCache: { data: Exploit[]; fetchedAt: number } | null = null;
+const CACHE_TTL_MS = 60 * 60 * 1000;
+
+async function fetchRecentExploits(vulnType: string): Promise<Exploit[]> {
+  if (!hacksCache || Date.now() - hacksCache.fetchedAt > CACHE_TTL_MS) {
+    try {
+      const res = await fetch("https://api.llama.fi/hacks", { signal: AbortSignal.timeout(8000) });
+      if (res.ok) {
+        const raw = await res.json() as Array<{
+          date: number; name: string; technique?: string; amount?: number;
+        }>;
+        hacksCache = {
+          fetchedAt: Date.now(),
+          data: raw
+            .filter((e) => e.amount && e.amount > 0)
+            .map((e) => ({
+              name: e.name,
+              date: new Date(e.date * 1000).toISOString().slice(0, 10),
+              amount: e.amount ?? 0,
+              technique: e.technique ?? "unknown",
+            }))
+            .sort((a, b) => b.amount - a.amount),
+        };
+      }
+    } catch { /* ignore fetch errors — LLM will still generate from its own knowledge */ }
+  }
+
+  if (!hacksCache) return [];
+
+  // Filter exploits relevant to the vulnerability type
+  const keywords = vulnType.toLowerCase().split(/\s+/);
+  return hacksCache.data
+    .filter((e) => keywords.some((k) => e.technique.toLowerCase().includes(k) || e.name.toLowerCase().includes(k)))
+    .slice(0, 5);
+}
+
+const VULN_KEYWORDS: Record<string, string[]> = {
+  reentrancy: ["reentrancy", "reentrance", "re-entry", "re-entrancy"],
+  "flash loan": ["flash loan", "flashloan", "flash-loan", "flash"],
+  oracle: ["oracle", "price manipulation", "price feed", "twap"],
+  bridge: ["bridge", "cross-chain", "crosschain", "relay", "validator"],
+  "access control": ["access control", "authorization", "privilege", "permission", "ownable"],
+  "integer overflow": ["overflow", "underflow", "integer", "arithmetic", "unchecked"],
+  "front running": ["front run", "frontrun", "mev", "sandwich", "mempool"],
 };
+
+function detectVulnType(text: string): string | null {
+  const lower = text.toLowerCase();
+  for (const [type, keywords] of Object.entries(VULN_KEYWORDS)) {
+    if (keywords.some((k) => lower.includes(k))) return type;
+  }
+  return null;
+}
 
 export const explainVulnAction: Action = {
   name: "EXPLAIN_VULNERABILITY",
-  description: "Explains DeFi vulnerability types with real exploit examples, code patterns, and mitigation strategies.",
+  description: "Explains DeFi vulnerability types with real exploit examples, code patterns, and mitigation strategies — generated live by Qwen via Nosana.",
   similes: ["EXPLAIN_VULN", "VULNERABILITY", "ATTACK_VECTOR", "EXPLOIT_TYPE", "SECURITY_BRIEF"],
   validate: async (_runtime: IAgentRuntime, message: Memory) => {
     const text = (message.content?.text || "").toLowerCase();
     return text.includes("vulnerab") || text.includes("exploit") || text.includes("attack") ||
            text.includes("reentrancy") || text.includes("flash loan") || text.includes("oracle") ||
-           text.includes("bridge") || text.includes("access control") || text.includes("explain");
+           text.includes("bridge") || text.includes("access control") || text.includes("overflow") ||
+           text.includes("front run") || text.includes("mev") || text.includes("explain");
   },
-  handler: async (_runtime: IAgentRuntime, message: Memory, _state?: State, _options?: HandlerOptions, callback?: HandlerCallback) => {
-    const text = (message.content?.text || "").toLowerCase();
+  handler: async (runtime: IAgentRuntime, message: Memory, _state?: State, _options?: HandlerOptions, callback?: HandlerCallback) => {
+    const text = message.content?.text || "";
+    const vulnType = detectVulnType(text);
 
-    // Match vulnerability type
-    let matched: VulnInfo | null = null;
-    for (const [key, info] of Object.entries(VULN_DATABASE)) {
-      if (text.includes(key)) { matched = info; break; }
-    }
-
-    if (!matched) {
-      // List available types
-      const types = Object.values(VULN_DATABASE).map(v => `- **${v.type}**`).join("\n");
+    if (!vulnType) {
+      const types = Object.keys(VULN_KEYWORDS).map((t) => `- **${t}**`).join("\n");
       if (callback) await callback({
         text: `## Available Vulnerability Explainers\n\n${types}\n\nSpecify a vulnerability type. Example: "Explain reentrancy attacks"`
       });
       return;
     }
 
-    const report = [
-      `## ${matched.type}`,
-      ``,
-      matched.description,
-      ``,
-      `### Real-World Exploits`,
-      matched.realExamples.map((e, i) =>
-        `${i+1}. **${e.name}** (${e.date}) — ${e.amount}\n   ${e.detail}`
-      ).join("\n"),
-      ``,
-      `### Mitigation Strategies`,
-      matched.mitigation.map((m, i) => `${i+1}. ${m}`).join("\n"),
-      ``,
-      `> Use ASSESS_PROTOCOL_RISK on a specific protocol to check for these patterns.`,
-    ].join("\n");
+    if (callback) await callback({ text: `Generating explanation for **${vulnType}** attacks...` });
 
-    if (callback) await callback({ text: report });
+    // Fetch relevant real-world examples from DeFiLlama
+    const recentExploits = await fetchRecentExploits(vulnType);
+    const exploitContext = recentExploits.length > 0
+      ? `Recent DeFiLlama-verified ${vulnType} exploits (sorted by size):\n` +
+        recentExploits.map((e) =>
+          `- ${e.name} (${e.date}): $${(e.amount / 1e6).toFixed(1)}M — technique: ${e.technique}`
+        ).join("\n")
+      : `No exact technique matches found in DeFiLlama — use your training knowledge for real-world examples.`;
+
+    const prompt = `You are Axiom, a DeFi security expert running on Nosana's decentralised GPU network.
+
+A user asked: "${text}"
+Detected vulnerability type: ${vulnType}
+
+${exploitContext}
+
+Generate a comprehensive security briefing covering:
+1. **How it works** — explain the attack mechanism clearly, step by step
+2. **Real recent examples** — reference the DeFiLlama data above where relevant, plus any other well-known historical examples you know
+3. **Vulnerable code pattern** — show a short Solidity snippet demonstrating the vulnerable pattern
+4. **Mitigation strategies** — concrete, actionable defences (code patterns, tools, best practices)
+
+Be specific and technical. This is for a DeFi security analyst. Format with markdown headers.`;
+
+    try {
+      const explanation = await generateText({
+        runtime,
+        context: prompt,
+        modelClass: ModelClass.LARGE,
+      });
+      if (callback) await callback({ text: explanation });
+    } catch (err) {
+      // Fallback: structured prompt without LLM
+      if (callback) await callback({
+        text: `## ${vulnType.charAt(0).toUpperCase() + vulnType.slice(1)} Attack\n\n` +
+              `LLM generation failed. Here are the top verified ${vulnType} exploits from DeFiLlama:\n\n` +
+              (recentExploits.length > 0
+                ? recentExploits.map((e) => `- **${e.name}** (${e.date}): $${(e.amount / 1e6).toFixed(1)}M`).join("\n")
+                : "No matching exploits found in DeFiLlama database.") +
+              `\n\n> Use ASSESS_PROTOCOL_RISK on a specific protocol to check for ${vulnType} patterns.`
+      });
+    }
   },
   examples: [[
     { name: "user", content: { text: "Explain flash loan attacks" } },
-    { name: "Axiom", content: { text: "Flash loan attacks exploit zero-collateral borrowing..." } },
+    { name: "Axiom", content: { text: "Generating explanation for **flash loan** attacks..." } },
   ]],
 };
