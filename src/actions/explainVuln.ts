@@ -24,6 +24,7 @@
 import { ModelType } from "@elizaos/core";
 import type { Action, IAgentRuntime, Memory, State, HandlerCallback, HandlerOptions } from "@elizaos/core";
 import { CURATED_EXPLOITS } from "../data/curatedExploits.js";
+import { fetchRektExploits } from "../utils/rektFetch.js";
 
 interface Exploit {
   name: string;
@@ -36,12 +37,25 @@ interface Exploit {
 let hacksCache: { data: Exploit[]; fetchedAt: number } | null = null;
 const CACHE_TTL_MS = 60 * 60 * 1000;
 
-/** Load exploits from DeFiLlama (live) or curated dataset (fallback) */
+/** Load exploits from rekt.news (primary), DeFiLlama (fallback), or curated dataset (last resort) */
 async function loadExploits(): Promise<Exploit[]> {
   if (hacksCache && Date.now() - hacksCache.fetchedAt < CACHE_TTL_MS) {
     return hacksCache.data;
   }
 
+  // 1. Primary: rekt.news
+  try {
+    const rektData = await fetchRektExploits();
+    const data = rektData
+      .map((e) => ({ name: e.name, date: e.date, amount: e.amount, technique: e.technique }))
+      .sort((a, b) => b.amount - a.amount);
+    hacksCache = { fetchedAt: Date.now(), data };
+    return data;
+  } catch {
+    // fall through to DeFiLlama
+  }
+
+  // 2. Fallback: DeFiLlama /hacks
   try {
     const res = await fetch("https://api.llama.fi/hacks", { signal: AbortSignal.timeout(8000) });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -70,16 +84,18 @@ async function loadExploits(): Promise<Exploit[]> {
     hacksCache = { fetchedAt: Date.now(), data };
     return data;
   } catch {
-    // Fallback to curated dataset
-    const fallback = CURATED_EXPLOITS.map((e) => ({
-      name: e.name,
-      date: e.date,
-      amount: e.amount,
-      technique: e.technique,
-    })).sort((a, b) => b.amount - a.amount);
-    hacksCache = { fetchedAt: Date.now(), data: fallback };
-    return fallback;
+    // fall through to curated dataset
   }
+
+  // 3. Last resort: curated dataset
+  const fallback = CURATED_EXPLOITS.map((e) => ({
+    name: e.name,
+    date: e.date,
+    amount: e.amount,
+    technique: e.technique,
+  })).sort((a, b) => b.amount - a.amount);
+  hacksCache = { fetchedAt: Date.now(), data: fallback };
+  return fallback;
 }
 
 async function fetchRecentExploits(vulnType: string): Promise<Exploit[]> {
@@ -138,11 +154,11 @@ export const explainVulnAction: Action = {
     // Fetch relevant real-world examples from DeFiLlama
     const recentExploits = await fetchRecentExploits(vulnType);
     const exploitContext = recentExploits.length > 0
-      ? `Recent DeFiLlama-verified ${vulnType} exploits (sorted by size):\n` +
+      ? `Recent verified ${vulnType} exploits from rekt.news (sorted by size):\n` +
         recentExploits.map((e) =>
           `- ${e.name} (${e.date}): $${(e.amount / 1e6).toFixed(1)}M — technique: ${e.technique}`
         ).join("\n")
-      : `No exact technique matches found in DeFiLlama — use your training knowledge for real-world examples.`;
+      : `No exact technique matches found in exploit database — use your training knowledge for real-world examples.`;
 
     const prompt = `You are Axiom, a DeFi security expert running on Nosana's decentralised GPU network.
 
@@ -168,10 +184,10 @@ Be specific and technical. This is for a DeFi security analyst. Format with mark
       // Fallback: structured prompt without LLM
       if (callback) await callback({
         text: `## ${vulnType.charAt(0).toUpperCase() + vulnType.slice(1)} Attack\n\n` +
-              `LLM generation failed. Here are the top verified ${vulnType} exploits from DeFiLlama:\n\n` +
+              `LLM generation failed. Here are the top verified ${vulnType} exploits:\n\n` +
               (recentExploits.length > 0
                 ? recentExploits.map((e) => `- **${e.name}** (${e.date}): $${(e.amount / 1e6).toFixed(1)}M`).join("\n")
-                : "No matching exploits found in DeFiLlama database.") +
+                : "No matching exploits found in database.") +
               `\n\n> Use ASSESS_PROTOCOL_RISK on a specific protocol to check for ${vulnType} patterns.`
       });
     }

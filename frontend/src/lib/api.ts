@@ -116,15 +116,77 @@ export function getExploitsByTechnique(): Record<string, number> {
   return map;
 }
 
-// --- Live Exploit Feed (DefiLlama /hacks) ---
+// --- Live Exploit Feed (rekt.news primary, DeFiLlama fallback, static last resort) ---
 
 let exploitCache: { data: Exploit[]; ts: number } | null = null;
-const EXPLOIT_CACHE_TTL = 10 * 60 * 1000; // 10 min
+const EXPLOIT_CACHE_TTL = 60 * 60 * 1000; // 1 hour
+
+function parseRektDate(dateStr: string): string {
+  if (!dateStr) return "Unknown";
+  const parts = dateStr.split("/");
+  if (parts.length !== 3) return dateStr;
+  const [month, day, year] = parts;
+  const fullYear = year.length === 2 ? `20${year}` : year;
+  return `${fullYear}-${month.padStart(2, "0")}-${day.padStart(2, "0")}`;
+}
+
+async function tryFetchRektNews(): Promise<Exploit[]> {
+  const res = await fetch("https://rekt.news/leaderboard/", {
+    signal: AbortSignal.timeout(12000),
+  });
+  if (!res.ok) throw new Error(`rekt.news HTTP ${res.status}`);
+  const html = await res.text();
+  const match = html.match(/<script[^>]+id="__NEXT_DATA__"[^>]*>([\s\S]*?)<\/script>/);
+  if (!match) throw new Error("__NEXT_DATA__ not found");
+  const nextData = JSON.parse(match[1]) as { props?: { pageProps?: { leaderboard?: unknown[] } } };
+  const leaderboard = nextData?.props?.pageProps?.leaderboard;
+  if (!Array.isArray(leaderboard) || leaderboard.length === 0) throw new Error("No leaderboard data");
+
+  const chainMap: Record<string, string> = {
+    bsc: "BSC", "binance smart chain": "BSC", ethereum: "Ethereum", solana: "Solana",
+    polygon: "Polygon", arbitrum: "Arbitrum", optimism: "Optimism", avalanche: "Avalanche",
+    base: "Base", blast: "Blast", sui: "Sui", "sui network": "Sui", tron: "TRON",
+    fantom: "Fantom",
+  };
+  function extractChain(tags: string[]): string {
+    for (const tag of tags) {
+      const lower = tag.toLowerCase();
+      for (const [key, value] of Object.entries(chainMap)) {
+        if (lower === key || lower.includes(key)) return value;
+      }
+    }
+    return "Multi";
+  }
+
+  return (leaderboard as Array<{ title: string; rekt: { amount?: number; date?: string }; tags?: string[] }>)
+    .filter((e) => e?.rekt?.amount && e.rekt.amount > 0)
+    .map((e) => ({
+      name: e.title.replace(/\s*[-\u2013]\s*(REKT|Rekt)\s*\d*\s*$/gi, "").trim(),
+      date: parseRektDate(e.rekt.date ?? ""),
+      amount: e.rekt.amount as number,
+      chain: extractChain(e.tags ?? []),
+      technique: (e.tags ?? []).find((t) =>
+        /flash.?loan|oracle|reentrancy|bridge|private.?key|access.?control|rug.?pull/i.test(t)
+      ) ?? "Unknown",
+    }))
+    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+}
 
 export async function fetchExploitsLive(): Promise<Exploit[]> {
   if (exploitCache && Date.now() - exploitCache.ts < EXPLOIT_CACHE_TTL) {
     return exploitCache.data;
   }
+
+  // 1. Primary: rekt.news (287 entries, free — may be blocked by CORS in browser)
+  try {
+    const data = await tryFetchRektNews();
+    exploitCache = { data, ts: Date.now() };
+    return data;
+  } catch {
+    // CORS or network error — fall through
+  }
+
+  // 2. Fallback: DeFiLlama /hacks
   try {
     const res = await fetch(`${DEFILLAMA_BASE}/hacks`);
     if (!res.ok) throw new Error("Failed to fetch exploit data");
@@ -159,13 +221,15 @@ export async function fetchExploitsLive(): Promise<Exploit[]> {
     exploitCache = { data, ts: Date.now() };
     return data;
   } catch {
-    // Fallback to curated dataset when API is paywalled or unavailable
-    const fallback = [...KNOWN_EXPLOITS].sort(
-      (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
-    );
-    exploitCache = { data: fallback, ts: Date.now() };
-    return fallback;
+    // fall through to last resort
   }
+
+  // 3. Last resort: static curated dataset
+  const fallback = [...KNOWN_EXPLOITS].sort(
+    (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
+  );
+  exploitCache = { data: fallback, ts: Date.now() };
+  return fallback;
 }
 
 // --- Agent chat ---
