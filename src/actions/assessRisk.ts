@@ -25,7 +25,7 @@
 
 import { ModelType } from "@elizaos/core";
 import type { Action, IAgentRuntime, Memory, State, HandlerCallback, HandlerOptions } from "@elizaos/core";
-import { formatUsd } from "../utils/api.js";
+import { formatUsd, cachedFetch } from "../utils/api.js";
 
 const DEFILLAMA_API = "https://api.llama.fi";
 const ETHERSCAN_API = "https://api.etherscan.io/v2/api";
@@ -40,7 +40,7 @@ interface SecurityScore {
   emoji: string;
 }
 
-async function computeSecurityScore(protocol: any): Promise<SecurityScore> {
+export async function computeSecurityScore(protocol: any): Promise<SecurityScore> {
   // --- Component 1: TVL Stability (0-25) ---
   // Penalise large swings in 24h or 7d TVL
   const change1d = Math.abs(protocol.change_1d ?? 0);
@@ -91,9 +91,8 @@ async function computeSecurityScore(protocol: any): Promise<SecurityScore> {
   // Cross-reference DefiLlama /hacks; penalise recent exploits more
   let exploitHistory = 25;
   try {
-    const hacksRes = await fetch(`${DEFILLAMA_API}/hacks`);
-    if (hacksRes.ok) {
-      const hacks = await hacksRes.json() as any[];
+    const hacks = await cachedFetch(`${DEFILLAMA_API}/hacks`);
+    if (Array.isArray(hacks)) {
       const nameLower = protocol.name.toLowerCase();
       const sixMonthsAgo = Date.now() - 6 * 30 * 24 * 60 * 60 * 1000;
       const twoYearsAgo = Date.now() - 2 * 365 * 24 * 60 * 60 * 1000;
@@ -126,9 +125,7 @@ async function computeSecurityScore(protocol: any): Promise<SecurityScore> {
 
 async function fetchProtocolData(name: string): Promise<any | null> {
   try {
-    const res = await fetch(`${DEFILLAMA_API}/protocols`);
-    if (!res.ok) return null;
-    const protocols = await res.json() as any[];
+    const protocols = await cachedFetch(`${DEFILLAMA_API}/protocols`) as any[];
     const match = protocols.find((p: any) =>
       p.name.toLowerCase() === name.toLowerCase() ||
       p.slug.toLowerCase() === name.toLowerCase()
@@ -136,6 +133,9 @@ async function fetchProtocolData(name: string): Promise<any | null> {
     return match || null;
   } catch { return null; }
 }
+
+/** Export for use by the Security Score API endpoint in server.ts */
+export { computeSecurityScore };
 
 function assessRiskLevel(tvl: number, change1d: number | null, audits: number, chains: number): string[] {
   const risks: string[] = [];
