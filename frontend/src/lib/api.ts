@@ -90,6 +90,38 @@ export function getExploitsByTechnique(): Record<string, number> {
   return map;
 }
 
+// --- Live Exploit Feed (DefiLlama /hacks) ---
+
+let exploitCache: { data: Exploit[]; ts: number } | null = null;
+const EXPLOIT_CACHE_TTL = 10 * 60 * 1000; // 10 min
+
+export async function fetchExploitsLive(): Promise<Exploit[]> {
+  if (exploitCache && Date.now() - exploitCache.ts < EXPLOIT_CACHE_TTL) {
+    return exploitCache.data;
+  }
+  const res = await fetch(`${DEFILLAMA_BASE}/hacks`);
+  if (!res.ok) throw new Error("Failed to fetch exploit data");
+  const raw = (await res.json()) as any[];
+  const data: Exploit[] = raw
+    .map((h) => ({
+      name: (h.name || "Unknown Protocol") as string,
+      date: h.date
+        ? new Date((h.date as number) * 1000).toISOString().split("T")[0]
+        : "Unknown",
+      amount: (h.amount ?? h.funds_lost ?? 0) as number,
+      chain:
+        Array.isArray(h.chains) && h.chains.length > 0
+          ? (h.chains[0] as string)
+          : ((h.chain as string | undefined) ?? "Unknown"),
+      technique: ((h.technique ?? h.category ?? "Unknown") as string),
+    }))
+    .filter((e) => e.amount > 0)
+    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+    .slice(0, 50);
+  exploitCache = { data, ts: Date.now() };
+  return data;
+}
+
 // --- Agent chat ---
 
 export async function sendMessage(agentId: string, text: string): Promise<string> {

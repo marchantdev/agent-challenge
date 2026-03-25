@@ -1,6 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import type { View, Protocol, Exploit } from "../lib/types";
-import { fetchProtocols, getExploits, getTotalExploitLoss, fetchHealth, detectAnomalies, formatUsd, getExploitsByTechnique } from "../lib/api";
+import { fetchProtocols, getExploits, getTotalExploitLoss, fetchHealth, detectAnomalies, formatUsd, getExploitsByTechnique, fetchExploitsLive } from "../lib/api";
 
 function StatCard({ label, value, sub, accent }: { label: string; value: string; sub?: string; accent?: string }) {
   return (
@@ -136,8 +136,11 @@ export default function Dashboard({ onNavigate }: { onNavigate: (v: View) => voi
   const [loading, setLoading] = useState(true);
   const [healthStatus, setHealthStatus] = useState<string>("checking...");
   const [latency, setLatency] = useState<number>(0);
+  const [exploits, setExploits] = useState<Exploit[]>(getExploits());
+  const [lastRefresh, setLastRefresh] = useState<number>(Date.now());
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  useEffect(() => {
+  const loadData = () => {
     fetchProtocols()
       .then(setProtocols)
       .catch(() => setProtocols([]))
@@ -146,9 +149,20 @@ export default function Dashboard({ onNavigate }: { onNavigate: (v: View) => voi
       setHealthStatus(h.status);
       setLatency(h.inferenceLatencyMs);
     });
+    fetchExploitsLive()
+      .then(setExploits)
+      .catch(() => {}); // fallback to static data already in state
+    setLastRefresh(Date.now());
+  };
+
+  useEffect(() => {
+    loadData();
+    intervalRef.current = setInterval(loadData, 60_000);
+    return () => {
+      if (intervalRef.current) clearInterval(intervalRef.current);
+    };
   }, []);
 
-  const exploits = getExploits();
   const totalTvl = protocols.reduce((s, p) => s + p.tvl, 0);
   const totalLoss = getTotalExploitLoss();
   const avgChange = protocols.length > 0
@@ -165,15 +179,25 @@ export default function Dashboard({ onNavigate }: { onNavigate: (v: View) => voi
             Real-time DeFi intelligence &mdash; powered by Nosana decentralized compute
           </p>
         </div>
-        <div className="flex items-center gap-2">
-          <span className="relative flex h-2 w-2">
-            <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${healthStatus === "healthy" ? "bg-emerald-500" : "bg-red-500"}`} />
-            <span className={`relative inline-flex rounded-full h-2 w-2 ${healthStatus === "healthy" ? "bg-emerald-500" : "bg-red-500"}`} />
-          </span>
-          <span className="text-xs text-zinc-500">
-            {healthStatus === "healthy" ? "Agent Online" : "Agent Offline"}
-            {latency > 0 && ` (${latency}ms)`}
-          </span>
+        <div className="flex items-center gap-3">
+          {/* Live badge */}
+          <div className="flex items-center gap-1.5 bg-emerald-950/40 border border-emerald-800/50 rounded-full px-2.5 py-1">
+            <span className="relative flex h-2 w-2">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-500 opacity-75" />
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
+            </span>
+            <span className="text-[10px] font-semibold text-emerald-400 tracking-wide">LIVE</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="relative flex h-2 w-2">
+              <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${healthStatus === "healthy" ? "bg-emerald-500" : "bg-red-500"}`} />
+              <span className={`relative inline-flex rounded-full h-2 w-2 ${healthStatus === "healthy" ? "bg-emerald-500" : "bg-red-500"}`} />
+            </span>
+            <span className="text-xs text-zinc-500">
+              {healthStatus === "healthy" ? "Agent Online" : "Agent Offline"}
+              {latency > 0 && ` (${latency}ms)`}
+            </span>
+          </div>
         </div>
       </div>
 

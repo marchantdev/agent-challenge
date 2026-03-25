@@ -11,6 +11,8 @@ import { readFile, stat } from "node:fs/promises";
 import { join, extname, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { logger } from "@elizaos/core";
+import { computeSecurityScore } from "./actions/assessRisk.ts";
+import { cachedFetch } from "./utils/api.ts";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -115,6 +117,44 @@ function handleHealth(res: ServerResponse): void {
   }));
 }
 
+async function handleSecurityScore(res: ServerResponse, protocol: string): Promise<void> {
+  try {
+    const protocols = (await cachedFetch("https://api.llama.fi/protocols")) as any[];
+    const match = protocols.find(
+      (p: any) =>
+        p.name.toLowerCase() === protocol.toLowerCase() ||
+        p.slug.toLowerCase() === protocol.toLowerCase()
+    );
+    if (!match) {
+      res.writeHead(404, { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" });
+      res.end(JSON.stringify({ error: `Protocol "${protocol}" not found on DefiLlama` }));
+      return;
+    }
+    const score = await computeSecurityScore(match);
+    res.writeHead(200, { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" });
+    res.end(
+      JSON.stringify({
+        protocol: match.name,
+        slug: match.slug,
+        tvl: match.tvl,
+        score: score.total,
+        components: {
+          tvlStability: score.tvlStability,
+          verification: score.verification,
+          maturity: score.maturity,
+          exploitHistory: score.exploitHistory,
+        },
+        label: score.label,
+        color: score.emoji,
+        timestamp: new Date().toISOString(),
+      })
+    );
+  } catch (err: any) {
+    res.writeHead(500, { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" });
+    res.end(JSON.stringify({ error: err.message || "Internal server error" }));
+  }
+}
+
 function handleMetrics(res: ServerResponse): void {
   const avgLatency = requestCount > 0 ? Math.round(totalResponseTime / requestCount) : 0;
   res.writeHead(200, { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" });
@@ -144,6 +184,13 @@ const server = createServer(async (req, res) => {
   // Health & metrics
   if (url === "/api/health" || url === "/health") { handleHealth(res); return; }
   if (url === "/api/metrics" || url === "/metrics") { handleMetrics(res); return; }
+
+  // Security Score API: GET /api/security-score/:protocol
+  const secScoreMatch = url.match(/^\/api\/security-score\/([^/?]+)/);
+  if (secScoreMatch && req.method === "GET") {
+    await handleSecurityScore(res, decodeURIComponent(secScoreMatch[1]));
+    return;
+  }
 
   // Proxy API calls to ElizaOS
   if (url.startsWith("/api/")) {

@@ -19,6 +19,7 @@ import { auditReconAction } from "./actions/auditRecon.ts";
 import { nosanaStatusAction } from "./actions/nosanaStatus.ts";
 import { monitorProtocolAction } from "./actions/monitorProtocol.ts";
 import { defiMarketProvider } from "./providers/defiMarketProvider.ts";
+import { responseQualityEvaluator } from "./evaluators/responseQualityEvaluator.ts";
 
 export const axiomPlugin: Plugin = {
   name: "axiom-security-plugin",
@@ -36,7 +37,7 @@ export const axiomPlugin: Plugin = {
     monitorProtocolAction,
   ],
   providers: [defiMarketProvider],
-  evaluators: [],
+  evaluators: [responseQualityEvaluator],
 };
 
 export default axiomPlugin;

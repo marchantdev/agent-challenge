@@ -135,6 +135,73 @@ GET /api/metrics
 
 ---
 
+## What You Can Ask Axiom
+
+Talk to Axiom in natural language. Here are example queries for each of the 10 actions:
+
+| Action | Example Query |
+|--------|---------------|
+| `ASSESS_PROTOCOL_RISK` | "Assess the risk of Aave V3" |
+| `EXPLAIN_VULNERABILITY` | "Explain reentrancy attacks" |
+| `SCAN_DEFI_TVL` | "Show top protocols by TVL" |
+| `INSPECT_CONTRACT` (ETH) | "Inspect contract 0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48" |
+| `INSPECT_CONTRACT` (Solana) | "Inspect GpXHXs5KfzfXbNKcMLNbAMsJsgPsBE7y5GtwVoiuxYvH" |
+| `EXPLOIT_HISTORY` | "Show recent DeFi exploits" |
+| `ANALYZE_WALLET` | "Analyze wallet 0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045" |
+| `SCAN_BOUNTIES` | "Show active bug bounties" |
+| `AUDIT_RECON` | "Audit recon on https://github.com/aave/aave-v3-core" |
+| `NOSANA_STATUS` | "Show Nosana network status" |
+| `MONITOR_PROTOCOL` | "Monitor Aave" then "Check watchlist" |
+
+---
+
+## Security Score API
+
+Axiom exposes a programmatic Security Score endpoint. Any agent or service can query Axiom for a protocol's security score without going through the chat interface — making Axiom a composable **security oracle**.
+
+```
+GET /api/security-score/:protocol
+```
+
+**Example:**
+```bash
+curl http://your-axiom-deployment/api/security-score/aave
+```
+
+**Response:**
+```json
+{
+  "protocol": "Aave V3",
+  "slug": "aave-v3",
+  "tvl": 12500000000,
+  "score": 87,
+  "components": {
+    "tvlStability": 25,
+    "verification": 25,
+    "maturity": 25,
+    "exploitHistory": 12
+  },
+  "label": "Low Risk",
+  "color": "🟢",
+  "timestamp": "2026-03-25T21:00:00.000Z"
+}
+```
+
+**Score Components (each 0–25, total 0–100):**
+
+| Component | What it measures |
+|-----------|-----------------|
+| `tvlStability` | 24h/7d TVL change — large swings signal instability |
+| `verification` | Etherscan source code verification status |
+| `maturity` | Time since DefiLlama listing — older = more battle-tested |
+| `exploitHistory` | Cross-referenced against DefiLlama /hacks database |
+
+**Score Labels:** 🟢 Low Risk (80–100) · 🟡 Moderate (60–79) · 🟠 Elevated (40–59) · 🔴 High Risk (0–39)
+
+This endpoint enables Axiom to act as infrastructure that other agents can query for protocol safety data.
+
+---
+
 ## Quick Start
 
 ### Local Development

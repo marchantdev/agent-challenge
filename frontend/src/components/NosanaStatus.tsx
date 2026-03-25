@@ -189,6 +189,35 @@ export default function NosanaStatus() {
         )}
       </div>
 
+      {/* Cost Efficiency */}
+      <div className="card border-emerald-800/30 bg-emerald-950/5">
+        <h3 className="font-medium text-emerald-400 mb-3">Cost Efficiency — Why Nosana Makes Economic Sense</h3>
+        <p className="text-sm text-zinc-400 mb-4">
+          Nosana's decentralized GPU marketplace delivers the same compute at a fraction of centralized cloud pricing.
+          Security infrastructure should be affordable, not a budget line item.
+        </p>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+          <div className="bg-zinc-800 rounded-lg p-3 text-center">
+            <p className="text-zinc-500 text-xs uppercase tracking-wider mb-1">Axiom on Nosana</p>
+            <p className="text-2xl font-bold font-mono text-emerald-400">~$0.30</p>
+            <p className="text-zinc-500 text-xs mt-0.5">per hour · NVIDIA RTX 3090</p>
+          </div>
+          <div className="bg-zinc-800 rounded-lg p-3 text-center">
+            <p className="text-zinc-500 text-xs uppercase tracking-wider mb-1">AWS p3.2xlarge</p>
+            <p className="text-2xl font-bold font-mono text-red-400">~$3.06</p>
+            <p className="text-zinc-500 text-xs mt-0.5">per hour · NVIDIA V100 16GB</p>
+          </div>
+          <div className="bg-zinc-800 rounded-lg p-3 text-center border border-emerald-800/40">
+            <p className="text-zinc-500 text-xs uppercase tracking-wider mb-1">Savings</p>
+            <p className="text-2xl font-bold font-mono text-emerald-400">~90%</p>
+            <p className="text-zinc-500 text-xs mt-0.5">$2.76/hr saved on GPU compute</p>
+          </div>
+        </div>
+        <p className="text-xs text-zinc-600">
+          Estimates based on Nosana spot pricing and AWS on-demand p3.2xlarge ($3.06/hr). Actual Nosana price varies by market.
+        </p>
+      </div>
+
       {/* Why Decentralized */}
       <div className="card border-emerald-800/30 bg-emerald-950/5">
         <h3 className="font-medium text-emerald-400 mb-2">Why Decentralized Security Infrastructure?</h3>
