@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from "react";
 import type { ChatMessage } from "../lib/types";
 import { sendMessage } from "../lib/api";
+import { renderMarkdown } from "../lib/markdown";
 
 const SUGGESTIONS = [
   "Assess Aave V3 risk",
@@ -10,87 +11,6 @@ const SUGGESTIONS = [
   "Inspect USDC contract",
   "Nosana network status",
 ];
-
-function renderInline(text: string): React.ReactNode {
-  const parts = text.split(/(\*\*[^*]+\*\*|`[^`]+`)/g);
-  return (
-    <>
-      {parts.map((part, i) => {
-        if (part.startsWith("**") && part.endsWith("**")) {
-          return <strong key={i} className="font-semibold text-zinc-100">{part.slice(2, -2)}</strong>;
-        }
-        if (part.startsWith("`") && part.endsWith("`")) {
-          return <code key={i} className="bg-zinc-800 border border-zinc-700 rounded px-1 py-0.5 text-xs font-mono text-emerald-300">{part.slice(1, -1)}</code>;
-        }
-        return <span key={i}>{part}</span>;
-      })}
-    </>
-  );
-}
-
-function formatMessageContent(text: string) {
-  const parts: React.ReactNode[] = [];
-  const lines = text.split("\n");
-  let inCodeBlock = false;
-  let codeLines: string[] = [];
-
-  lines.forEach((line, idx) => {
-    if (line.startsWith("```")) {
-      if (inCodeBlock) {
-        parts.push(
-          <pre key={`code-${idx}`} className="bg-zinc-900 border border-zinc-700 rounded-md p-3 my-2 overflow-x-auto text-xs font-mono">
-            <code>{codeLines.join("\n")}</code>
-          </pre>
-        );
-        codeLines = [];
-        inCodeBlock = false;
-      } else {
-        inCodeBlock = true;
-      }
-      return;
-    }
-    if (inCodeBlock) { codeLines.push(line); return; }
-    if (line.startsWith("### ")) {
-      parts.push(<h4 key={idx} className="font-semibold text-zinc-200 mt-3 mb-1 text-sm">{line.slice(4)}</h4>);
-      return;
-    }
-    if (line.startsWith("## ")) {
-      parts.push(<h3 key={idx} className="font-bold text-zinc-100 mt-3 mb-1">{line.slice(3)}</h3>);
-      return;
-    }
-    if (line.match(/^[-*]\s/)) {
-      parts.push(
-        <div key={idx} className="flex items-start gap-2 ml-2 my-0.5">
-          <span className="text-emerald-500 mt-0.5 shrink-0">&#8226;</span>
-          <span>{renderInline(line.slice(2))}</span>
-        </div>
-      );
-      return;
-    }
-    if (line.match(/^\d+\.\s/)) {
-      const num = line.match(/^(\d+)\./)?.[1] || "";
-      parts.push(
-        <div key={idx} className="flex items-start gap-2 ml-2 my-0.5">
-          <span className="text-emerald-400 font-mono text-xs mt-0.5 w-4 shrink-0">{num}.</span>
-          <span>{renderInline(line.replace(/^\d+\.\s/, ""))}</span>
-        </div>
-      );
-      return;
-    }
-    if (line.trim() === "") { parts.push(<div key={idx} className="h-2" />); return; }
-    parts.push(<p key={idx} className="my-0.5">{renderInline(line)}</p>);
-  });
-
-  if (inCodeBlock && codeLines.length > 0) {
-    parts.push(
-      <pre key="code-end" className="bg-zinc-900 border border-zinc-700 rounded-md p-3 my-2 overflow-x-auto text-xs font-mono">
-        <code>{codeLines.join("\n")}</code>
-      </pre>
-    );
-  }
-
-  return <div>{parts}</div>;
-}
 
 function MessageBubble({ msg }: { msg: ChatMessage }) {
   const isUser = msg.role === "user";
@@ -111,7 +31,7 @@ function MessageBubble({ msg }: { msg: ChatMessage }) {
           </div>
         )}
         <div className="leading-relaxed">
-          {isUser ? msg.text : formatMessageContent(msg.text)}
+          {isUser ? msg.text : renderMarkdown(msg.text)}
         </div>
         <div className="text-[10px] text-zinc-600 mt-2 text-right">
           {new Date(msg.timestamp).toLocaleTimeString()}
