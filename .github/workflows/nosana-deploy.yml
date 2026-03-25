@@ -1,0 +1,104 @@
+name: Deploy to Nosana
+
+# Automatically redeploy to Nosana on every push to main.
+# Requires: NOSANA_PRIVATE_KEY secret (Solana keypair as base58 string)
+#
+# Setup:
+#   1. Go to repo Settings → Secrets and variables → Actions
+#   2. Add secret: NOSANA_PRIVATE_KEY = <your Solana wallet private key as base58>
+#   3. Ensure the wallet has sufficient SOL + NOS for job posting
+#
+# Nosana CLI docs: https://learn.nosana.com/cli
+# Nosana job definitions: nos_job_def/nosana_eliza_job_definition.json
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      reason:
+        description: "Reason for manual deploy"
+        required: false
+        default: "Manual trigger"
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+        with:
+          driver: docker-container
+
+      - name: Log in to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=sha,prefix=sha-
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+
+      - name: Set up Node.js for Nosana CLI
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install Nosana CLI
+        run: npm install -g @nosana/cli
+
+      - name: Update job definition with latest image
+        run: |
+          IMAGE_TAG="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest"
+          # Update image in job definition to use the freshly built tag
+          jq --arg img "$IMAGE_TAG" '.ops[0].args.image = $img' \
+            nos_job_def/nosana_eliza_job_definition.json > /tmp/job_def_updated.json
+          mv /tmp/job_def_updated.json nos_job_def/nosana_eliza_job_definition.json
+          echo "Updated job definition image to: $IMAGE_TAG"
+          cat nos_job_def/nosana_eliza_job_definition.json
+
+      - name: Deploy to Nosana
+        if: ${{ secrets.NOSANA_PRIVATE_KEY != '' }}
+        run: |
+          nosana job post \
+            --file nos_job_def/nosana_eliza_job_definition.json \
+            --market nvidia-3090 \
+            --wait
+        env:
+          NOSANA_PRIVATE_KEY: ${{ secrets.NOSANA_PRIVATE_KEY }}
+
+      - name: Nosana deploy skipped (no key configured)
+        if: ${{ secrets.NOSANA_PRIVATE_KEY == '' }}
+        run: |
+          echo "⚠️ NOSANA_PRIVATE_KEY secret not configured."
+          echo "Add NOSANA_PRIVATE_KEY to repository secrets to enable automatic Nosana deployment."
+          echo "See: https://learn.nosana.com/cli for setup instructions."
+          echo ""
+          echo "Docker image has been pushed to GHCR successfully."
+          echo "You can deploy manually via: nosana job post --file nos_job_def/nosana_eliza_job_definition.json"
