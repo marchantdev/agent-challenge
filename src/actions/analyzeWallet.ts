@@ -7,12 +7,11 @@
 
 import type { Action, IAgentRuntime, Memory, State, HandlerCallback, HandlerOptions } from "@elizaos/core";
 
+import { solanaRpc, WELL_KNOWN_TOKENS } from "../utils/solanaRpc.js";
+
 const ETHERSCAN_API = "https://api.etherscan.io/api";
 const DEFILLAMA_API = "https://api.llama.fi";
 const ETH_API_KEY = process.env.ETHERSCAN_API_KEY || "";
-
-const SOLSCAN_API = "https://public-api.solscan.io";
-const SOLSCAN_TOKEN = process.env.SOLSCAN_API_KEY || "";
 
 // ─── Shared types ─────────────────────────────────────────────────────────────
 
@@ -119,13 +118,7 @@ async function fetchErc20Balances(address: string): Promise<TokenBalance[]> {
   } catch { return []; }
 }
 
-// ─── Solana wallet functions ──────────────────────────────────────────────────
-
-function solscanHeaders(): HeadersInit {
-  const h: HeadersInit = { "Accept": "application/json" };
-  if (SOLSCAN_TOKEN) h["token"] = SOLSCAN_TOKEN;
-  return h;
-}
+// ─── Solana wallet functions (Solana JSON-RPC — no API key required) ──────────
 
 interface SplToken {
   symbol: string;
@@ -139,55 +132,54 @@ interface SplToken {
 
 async function fetchSolBalance(address: string): Promise<number | null> {
   try {
-    // Use Solana JSON-RPC as primary source (free, no rate limit)
-    const res = await fetch("https://api.mainnet-beta.solana.com", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        jsonrpc: "2.0", id: 1, method: "getBalance",
-        params: [address, { commitment: "confirmed" }]
-      }),
-      signal: AbortSignal.timeout(8000),
-    });
-    if (!res.ok) return null;
-    const data = await res.json() as any;
-    const lamports = data?.result?.value;
+    const result = await solanaRpc("getBalance", [address, { commitment: "confirmed" }]) as any;
+    const lamports = result?.value;
     return typeof lamports === "number" ? lamports / 1e9 : null;
   } catch { return null; }
 }
 
 async function fetchSplTokens(address: string): Promise<SplToken[]> {
   try {
-    // Solscan: GET /account/tokens?account={address}
-    const res = await fetch(
-      `${SOLSCAN_API}/account/tokens?account=${address}`,
-      { headers: solscanHeaders(), signal: AbortSignal.timeout(10000) }
-    );
-    if (!res.ok) return [];
-    const data = await res.json() as any;
-    const items = Array.isArray(data) ? data : (data.data ?? []);
-    return items.slice(0, 15).map((t: any) => ({
-      symbol: t.tokenSymbol ?? t.symbol ?? "???",
-      name: t.tokenName ?? t.name ?? "Unknown",
-      tokenAddress: t.tokenAddress ?? t.mint ?? "",
-      amount: t.tokenAmount?.amount ?? t.amount ?? 0,
-      decimals: t.tokenAmount?.decimals ?? t.decimals ?? 0,
-      uiAmount: t.tokenAmount?.uiAmount ?? t.uiAmount ?? 0,
-      priceUsdt: t.priceUsdt ?? null,
-    }));
+    // getTokenAccountsByOwner returns all SPL token accounts for this wallet
+    const result = await solanaRpc("getTokenAccountsByOwner", [
+      address,
+      { programId: "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA" },
+      { encoding: "jsonParsed" },
+    ]) as any;
+    const accounts: any[] = result?.value ?? [];
+    return accounts
+      .slice(0, 15)
+      .map((acct: any) => {
+        const info = acct?.account?.data?.parsed?.info;
+        if (!info) return null;
+        const mint: string = info.mint ?? "";
+        const ta = info.tokenAmount ?? {};
+        const uiAmount: number = ta.uiAmount ?? 0;
+        // Skip zero-balance accounts
+        if (uiAmount === 0 && (ta.amount === "0" || ta.amount === 0)) return null;
+        const known = WELL_KNOWN_TOKENS[mint];
+        return {
+          symbol:       known?.symbol ?? mint.slice(0, 6) + "…",
+          name:         known?.name   ?? `Token (${mint.slice(0, 8)}…)`,
+          tokenAddress: mint,
+          amount:       parseInt(ta.amount ?? "0", 10),
+          decimals:     ta.decimals ?? 0,
+          uiAmount,
+          priceUsdt:    null,  // RPC has no price data — DefiLlama could be added later
+        } as SplToken;
+      })
+      .filter((t): t is SplToken => t !== null);
   } catch { return []; }
 }
 
 async function fetchSolanaRecentTxs(address: string): Promise<any[]> {
   try {
-    // Solscan: GET /account/transactions?account={address}&limit=10
-    const res = await fetch(
-      `${SOLSCAN_API}/account/transactions?account=${address}&limit=10`,
-      { headers: solscanHeaders(), signal: AbortSignal.timeout(10000) }
-    );
-    if (!res.ok) return [];
-    const data = await res.json() as any;
-    return Array.isArray(data) ? data : (data.data ?? []);
+    // getSignaturesForAddress returns { signature, slot, blockTime, err }
+    const result = await solanaRpc("getSignaturesForAddress", [
+      address,
+      { limit: 10 },
+    ]) as any[];
+    return Array.isArray(result) ? result : [];
   } catch { return []; }
 }
 
@@ -410,7 +402,7 @@ export const analyzeWalletAction: Action = {
     if (solAddr) {
       const shortAddr = `${solAddr.slice(0, 6)}...${solAddr.slice(-4)}`;
       if (callback) await callback({
-        text: `Analyzing Solana wallet \`${shortAddr}\`...\n\nFetching on-chain data from Solana RPC + Solscan.`
+        text: `Analyzing Solana wallet \`${shortAddr}\`...\n\nFetching on-chain data from Solana JSON-RPC.`
       });
 
       const [solBalance, splTokens, protocols, recentTxs] = await Promise.all([
@@ -478,9 +470,9 @@ export const analyzeWalletAction: Action = {
         sections.push(`|---|-----------|------------|--------|`);
         for (let i = 0; i < Math.min(5, recentTxs.length); i++) {
           const tx = recentTxs[i];
-          const sig = (tx.txHash ?? tx.signature ?? "").slice(0, 16) + "...";
-          const time = tx.blockTime ? new Date(tx.blockTime * 1000).toISOString().split("T")[0] : "unknown";
-          const status = tx.status === "Success" || tx.err === null ? "✅" : "❌";
+          const sig = (tx.signature ?? "").slice(0, 16) + "...";
+          const time = tx.blockTime ? new Date((tx.blockTime as number) * 1000).toISOString().split("T")[0] : "unknown";
+          const status = tx.err === null ? "✅" : "❌";
           sections.push(`| ${i + 1} | \`${sig}\` | ${time} | ${status} |`);
         }
         sections.push("");
@@ -505,7 +497,7 @@ export const analyzeWalletAction: Action = {
         sections.push("- 💡 Use separate wallets for trading vs long-term holding");
       }
       sections.push("");
-      sections.push(`_Data from Solana RPC + Solscan + DefiLlama. [View on Solscan](https://solscan.io/account/${solAddr})_`);
+      sections.push(`_Data from Solana JSON-RPC + DefiLlama. [View on Solscan](https://solscan.io/account/${solAddr})_`);
 
       if (callback) await callback({ text: sections.join("\n") });
     }

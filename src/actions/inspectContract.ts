@@ -11,8 +11,7 @@ const ETHERSCAN_API = "https://api.etherscan.io/api";
 // Free Etherscan tier works without a key (rate-limited to 5 req/sec)
 const ETH_API_KEY = process.env.ETHERSCAN_API_KEY || "";
 
-const SOLSCAN_API = "https://public-api.solscan.io";
-const SOLSCAN_TOKEN = process.env.SOLSCAN_API_KEY || "";
+import { solanaRpc, deriveAccountType } from "../utils/solanaRpc.js";
 
 // ─── Address detection ────────────────────────────────────────────────────────
 
@@ -37,32 +36,23 @@ function extractSolanaAddress(text: string): string | null {
   return null;
 }
 
-// ─── Solscan helpers ──────────────────────────────────────────────────────────
-
-function solscanHeaders(): HeadersInit {
-  const h: HeadersInit = { "Accept": "application/json" };
-  if (SOLSCAN_TOKEN) h["token"] = SOLSCAN_TOKEN;
-  return h;
-}
+// ─── Solana RPC helpers ───────────────────────────────────────────────────────
 
 async function fetchSolanaAccountInfo(address: string): Promise<any> {
-  const res = await fetch(
-    `${SOLSCAN_API}/account/${address}`,
-    { headers: solscanHeaders(), signal: AbortSignal.timeout(10000) }
-  );
-  if (!res.ok) throw new Error(`Solscan account info: HTTP ${res.status}`);
-  return res.json();
+  const result = await solanaRpc("getAccountInfo", [
+    address,
+    { encoding: "jsonParsed", commitment: "confirmed" },
+  ]) as any;
+  return result?.value ?? null;
 }
 
 async function fetchSolanaTransactions(address: string): Promise<any[]> {
   try {
-    const res = await fetch(
-      `${SOLSCAN_API}/account/transactions?account=${address}&limit=10`,
-      { headers: solscanHeaders(), signal: AbortSignal.timeout(10000) }
-    );
-    if (!res.ok) return [];
-    const data = await res.json() as any;
-    return Array.isArray(data) ? data : (data.data ?? []);
+    const result = await solanaRpc("getSignaturesForAddress", [
+      address,
+      { limit: 10 },
+    ]) as any[];
+    return Array.isArray(result) ? result : [];
   } catch { return []; }
 }
 
@@ -152,15 +142,15 @@ async function handleSolanaProgram(
   const info = accountInfo.status === "fulfilled" ? accountInfo.value : null;
   const txs = recentTxs.status === "fulfilled" ? recentTxs.value : [];
 
-  // Parse account data
-  const lamports: number = info?.lamports ?? info?.data?.lamports ?? 0;
+  // Parse account data — RPC getAccountInfo returns flat { lamports, owner, executable, rentEpoch, data }
+  const lamports: number = info?.lamports ?? 0;
   const solBalance = (lamports / 1e9).toFixed(6);
-  const accountType: string = info?.type ?? info?.data?.type ?? "unknown";
-  const isProgram = accountType === "program_account" || accountType === "program";
-  const isSystemProgram = info?.data?.owner === "11111111111111111111111111111111";
-  const owner: string = info?.data?.owner ?? info?.owner ?? "Unknown";
-  const executable: boolean = info?.data?.executable ?? info?.executable ?? false;
-  const rentEpoch: number | null = info?.data?.rentEpoch ?? info?.rentEpoch ?? null;
+  const owner: string = info?.owner ?? "Unknown";
+  const executable: boolean = info?.executable ?? false;
+  const rentEpoch: number | null = info?.rentEpoch ?? null;
+  const accountType: string = deriveAccountType(owner, executable);
+  const isProgram = executable;
+  const isSystemProgram = owner === "11111111111111111111111111111111";
 
   // Build flags
   const flags: string[] = [];
@@ -176,10 +166,11 @@ async function handleSolanaProgram(
 
   // Recent tx summary
   const txCount = txs.length;
-  const firstTxSig = txs[txs.length - 1]?.txHash ?? txs[txs.length - 1]?.signature ?? null;
-  const lastTxSig = txs[0]?.txHash ?? txs[0]?.signature ?? null;
+  // getSignaturesForAddress returns { signature, blockTime, err, ... }
+  const firstTxSig = txs[txs.length - 1]?.signature ?? null;
+  const lastTxSig = txs[0]?.signature ?? null;
   const lastTxTime = txs[0]?.blockTime
-    ? new Date(txs[0].blockTime * 1000).toISOString().split("T")[0]
+    ? new Date((txs[0].blockTime as number) * 1000).toISOString().split("T")[0]
     : "Unknown";
 
   const contractContext = `Solana Address: ${address} | Balance: ${solBalance} SOL | Type: ${accountType} | Executable: ${executable} | Owner Program: ${owner} | Recent tx count (last 10): ${txCount} | Last activity: ${lastTxTime}`;
