@@ -49,11 +49,11 @@ const protocolRiskAction = {
   examples: [
     [
       {
-        user: "{{user1}}",
+        name: "{{user1}}",
         content: { text: "Can you assess the risk of this Aave fork?" },
       },
       {
-        user: "Axiom",
+        name: "Axiom",
         content: {
           text: "**Axiom Risk Assessment Framework: Aave fork**\n\nI apply a 5-layer analysis...",
           action: "ASSESS_PROTOCOL_RISK",
@@ -62,11 +62,11 @@ const protocolRiskAction = {
     ],
     [
       {
-        user: "{{user1}}",
+        name: "{{user1}}",
         content: { text: "Audit this yield vault for me" },
       },
       {
-        user: "Axiom",
+        name: "Axiom",
         content: {
           text: "**Axiom Risk Assessment Framework: yield vault**\n\nI'll walk through the systematic analysis...",
           action: "ASSESS_PROTOCOL_RISK",
@@ -140,11 +140,11 @@ const vulnExplainerAction = {
   examples: [
     [
       {
-        user: "{{user1}}",
+        name: "{{user1}}",
         content: { text: "Explain reentrancy attacks to me" },
       },
       {
-        user: "Axiom",
+        name: "Axiom",
         content: {
           text: "**Reentrancy** — Classic DeFi attack vector. $60M lost in the DAO hack alone...",
           action: "EXPLAIN_VULNERABILITY",
@@ -153,11 +153,11 @@ const vulnExplainerAction = {
     ],
     [
       {
-        user: "{{user1}}",
+        name: "{{user1}}",
         content: { text: "How do flash loan attacks work?" },
       },
       {
-        user: "Axiom",
+        name: "Axiom",
         content: {
           text: "**Flash Loan Attacks** — Uncollateralised capital weaponised against oracle-dependent protocols...",
           action: "EXPLAIN_VULNERABILITY",
@@ -166,11 +166,11 @@ const vulnExplainerAction = {
     ],
     [
       {
-        user: "{{user1}}",
+        name: "{{user1}}",
         content: { text: "What is oracle manipulation?" },
       },
       {
-        user: "Axiom",
+        name: "Axiom",
         content: {
           text: "**Oracle Manipulation & Price Feed Attacks** — The single largest source of DeFi losses...",
           action: "EXPLAIN_VULNERABILITY",
