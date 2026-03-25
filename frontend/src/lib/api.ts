@@ -1,4 +1,4 @@
-import type { Protocol, Exploit, NosanaHealth, NosanaMetrics, NosanaNetwork, ContractInfo } from "./types";
+import type { Protocol, Exploit, NosanaHealth, NosanaMetrics, NosanaNetwork } from "./types";
 
 const DEFILLAMA_BASE = "https://api.llama.fi";
 const AGENT_BASE = "/api"; // proxied to ElizaOS
@@ -174,45 +174,6 @@ export async function fetchNosanaNetwork(): Promise<NosanaNetwork> {
       networkVersion: "1.0",
     };
   }
-}
-
-// --- Contract inspection ---
-
-export async function inspectContract(address: string): Promise<ContractInfo> {
-  const isEth = address.startsWith("0x") && address.length === 42;
-  if (!isEth) {
-    throw new Error("Only Ethereum addresses supported. Solana support coming soon.");
-  }
-
-  const base = "https://api.etherscan.io/api";
-
-  const [balRes, srcRes] = await Promise.all([
-    fetch(`${base}?module=account&action=balance&address=${address}&tag=latest&apikey=YourApiKeyToken`),
-    fetch(`${base}?module=contract&action=getsourcecode&address=${address}&apikey=YourApiKeyToken`),
-  ]);
-
-  const balance = await balRes.json();
-  const src = await srcRes.json();
-
-  const weiBalance = balance.result || "0";
-  const ethBalance = (parseInt(weiBalance) / 1e18).toFixed(4);
-  const verified = !!src.result?.[0]?.SourceCode;
-  const contractName = src.result?.[0]?.ContractName || "Unknown";
-  const isProxy = src.result?.[0]?.Proxy === "1";
-  const implementation = src.result?.[0]?.Implementation || undefined;
-  const compilerVersion = src.result?.[0]?.CompilerVersion || undefined;
-
-  return {
-    address,
-    chain: "Ethereum",
-    balance: `${ethBalance} ETH`,
-    txCount: 0,
-    verified,
-    contractName,
-    isProxy,
-    implementation,
-    compilerVersion,
-  };
 }
 
 // --- Risk detection helpers ---

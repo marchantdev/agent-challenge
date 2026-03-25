@@ -1,119 +1,111 @@
-import { useState } from "react";
-import { inspectContract } from "../lib/api";
-import type { ContractInfo } from "../lib/types";
+import React, { useState } from "react";
+import { sendMessage } from "../lib/api";
 
-interface ScanHistory {
+interface ScanResult {
   address: string;
   timestamp: number;
-  result: ContractInfo | { error: string };
+  text?: string;
+  error?: string;
 }
 
-function RiskBadge({ level }: { level: string }) {
-  const cls =
-    level === "Critical" ? "badge-critical" :
-    level === "High" ? "badge-high" :
-    level === "Medium" ? "badge-medium" :
-    level === "Low" ? "badge-low" :
-    "badge-info";
-  return <span className={cls}>{level}</span>;
+// Inline markdown renderer (same style as Chat component)
+function renderInline(text: string): React.ReactNode {
+  const parts = text.split(/(\*\*[^*]+\*\*|`[^`]+`)/g);
+  return (
+    <>
+      {parts.map((part, i) => {
+        if (part.startsWith("**") && part.endsWith("**")) {
+          return <strong key={i} className="font-semibold text-zinc-100">{part.slice(2, -2)}</strong>;
+        }
+        if (part.startsWith("`") && part.endsWith("`")) {
+          return <code key={i} className="bg-zinc-800 border border-zinc-700 rounded px-1 py-0.5 text-xs font-mono text-emerald-300">{part.slice(1, -1)}</code>;
+        }
+        return <span key={i}>{part}</span>;
+      })}
+    </>
+  );
 }
 
-function getRiskLevel(result: ContractInfo): string {
-  if (!result.verified) return "High";
-  if (result.isProxy) return "Medium";
-  return "Low";
-}
+function formatAgentResponse(text: string): React.ReactNode {
+  const parts: React.ReactNode[] = [];
+  const lines = text.split("\n");
+  let inCodeBlock = false;
+  let codeLines: string[] = [];
 
-function getRiskItems(result: ContractInfo): { color: string; text: string }[] {
-  const items: { color: string; text: string }[] = [];
-  if (!result.verified) {
-    items.push({ color: "bg-red-500", text: "Unverified source code \u2014 cannot audit contract logic" });
-  }
-  if (result.isProxy) {
-    items.push({ color: "bg-amber-500", text: "Proxy contract \u2014 admin can upgrade implementation logic" });
-    if (result.implementation) {
-      items.push({ color: "bg-blue-500", text: `Implementation: ${result.implementation}` });
+  lines.forEach((line, idx) => {
+    if (line.startsWith("```")) {
+      if (inCodeBlock) {
+        parts.push(
+          <pre key={`code-${idx}`} className="bg-zinc-900 border border-zinc-700 rounded-md p-3 my-2 overflow-x-auto text-xs font-mono">
+            <code>{codeLines.join("\n")}</code>
+          </pre>
+        );
+        codeLines = [];
+        inCodeBlock = false;
+      } else {
+        inCodeBlock = true;
+      }
+      return;
     }
-  }
-  if (result.verified && !result.isProxy) {
-    items.push({ color: "bg-emerald-500", text: "Verified, non-upgradeable \u2014 logic is immutable" });
-  }
-  if (result.verified) {
-    items.push({ color: "bg-emerald-500", text: "Source code verified on Etherscan" });
-  }
-  if (result.compilerVersion) {
-    const ver = result.compilerVersion;
-    if (ver.includes("0.8")) {
-      items.push({ color: "bg-emerald-500", text: `Solidity ${ver.split("+")[0].replace("v", "")} \u2014 built-in overflow protection` });
-    } else if (ver.includes("0.7") || ver.includes("0.6")) {
-      items.push({ color: "bg-amber-500", text: `Solidity ${ver.split("+")[0].replace("v", "")} \u2014 no built-in overflow checks` });
+    if (inCodeBlock) { codeLines.push(line); return; }
+    if (line.startsWith("### ")) {
+      parts.push(<h4 key={idx} className="font-semibold text-zinc-200 mt-3 mb-1 text-sm">{line.slice(4)}</h4>);
+      return;
     }
-  }
-  return items;
-}
+    if (line.startsWith("## ")) {
+      parts.push(<h3 key={idx} className="font-bold text-zinc-100 mt-3 mb-1">{line.slice(3)}</h3>);
+      return;
+    }
+    if (line.match(/^[-*]\s/)) {
+      parts.push(
+        <div key={idx} className="flex items-start gap-2 ml-2 my-0.5">
+          <span className="text-emerald-500 mt-0.5 shrink-0">&#8226;</span>
+          <span>{renderInline(line.slice(2))}</span>
+        </div>
+      );
+      return;
+    }
+    if (line.match(/^\d+\.\s/)) {
+      const num = line.match(/^(\d+)\./)?.[1] || "";
+      parts.push(
+        <div key={idx} className="flex items-start gap-2 ml-2 my-0.5">
+          <span className="text-emerald-400 font-mono text-xs mt-0.5 w-4 shrink-0">{num}.</span>
+          <span>{renderInline(line.replace(/^\d+\.\s/, ""))}</span>
+        </div>
+      );
+      return;
+    }
+    if (line.trim() === "") { parts.push(<div key={idx} className="h-2" />); return; }
+    parts.push(<p key={idx} className="my-0.5">{renderInline(line)}</p>);
+  });
 
-function ResultCard({ result }: { result: ContractInfo | { error: string } }) {
-  if ("error" in result) {
-    return (
-      <div className="card border-red-900/50">
-        <p className="text-red-400 text-sm">{result.error}</p>
-      </div>
+  if (inCodeBlock && codeLines.length > 0) {
+    parts.push(
+      <pre key="code-end" className="bg-zinc-900 border border-zinc-700 rounded-md p-3 my-2 overflow-x-auto text-xs font-mono">
+        <code>{codeLines.join("\n")}</code>
+      </pre>
     );
   }
 
-  const riskLevel = getRiskLevel(result);
-  const riskItems = getRiskItems(result);
+  return <div className="text-sm text-zinc-200 leading-relaxed">{parts}</div>;
+}
 
+function ResultCard({ result }: { result: ScanResult }) {
   return (
-    <div className="card space-y-4">
-      <div className="flex items-center justify-between">
+    <div className="card space-y-3">
+      <div className="flex items-center justify-between border-b border-zinc-800 pb-3">
         <div className="flex items-center gap-2">
-          <h3 className="font-medium">{result.contractName || "Contract"}</h3>
-          <span className="text-xs text-zinc-500">{result.chain}</span>
+          <span className="w-5 h-5 rounded bg-emerald-600 flex items-center justify-center text-[10px] font-bold text-white shrink-0">A</span>
+          <span className="text-[10px] text-emerald-400 font-semibold tracking-wide">AXIOM</span>
+          <span className="text-xs text-zinc-500 font-mono truncate max-w-[200px] sm:max-w-xs">{result.address}</span>
         </div>
-        <RiskBadge level={riskLevel} />
+        <span className="text-[10px] text-zinc-600">{new Date(result.timestamp).toLocaleTimeString()}</span>
       </div>
-
-      <div className="grid grid-cols-2 gap-3 text-sm">
-        <div>
-          <p className="text-zinc-500 text-xs uppercase tracking-wider">Address</p>
-          <p className="font-mono text-xs mt-1 text-zinc-300 break-all">{result.address}</p>
-        </div>
-        <div>
-          <p className="text-zinc-500 text-xs uppercase tracking-wider">Balance</p>
-          <p className="font-mono mt-1">{result.balance}</p>
-        </div>
-        <div>
-          <p className="text-zinc-500 text-xs uppercase tracking-wider">Verified Source</p>
-          <p className={`mt-1 font-medium ${result.verified ? "text-emerald-400" : "text-red-400"}`}>
-            {result.verified ? "Yes" : "No"}
-          </p>
-        </div>
-        <div>
-          <p className="text-zinc-500 text-xs uppercase tracking-wider">Proxy Contract</p>
-          <p className={`mt-1 font-medium ${result.isProxy ? "text-amber-400" : "text-zinc-300"}`}>
-            {result.isProxy ? "Yes (upgradeable)" : "No"}
-          </p>
-        </div>
-        {result.compilerVersion && (
-          <div className="col-span-2">
-            <p className="text-zinc-500 text-xs uppercase tracking-wider">Compiler</p>
-            <p className="font-mono text-xs mt-1 text-zinc-300">{result.compilerVersion}</p>
-          </div>
-        )}
-      </div>
-
-      <div className="border-t border-zinc-800 pt-3">
-        <h4 className="text-xs text-zinc-500 uppercase tracking-wider mb-2">Risk Assessment</h4>
-        <ul className="space-y-1.5">
-          {riskItems.map((item, i) => (
-            <li key={i} className="flex items-start gap-2 text-sm">
-              <span className={`w-1.5 h-1.5 rounded-full ${item.color} mt-1.5 shrink-0`} />
-              <span className="text-zinc-300">{item.text}</span>
-            </li>
-          ))}
-        </ul>
-      </div>
+      {result.error ? (
+        <p className="text-red-400 text-sm">{result.error}</p>
+      ) : (
+        formatAgentResponse(result.text || "")
+      )}
     </div>
   );
 }
@@ -128,7 +120,7 @@ const EXAMPLES = [
 export default function Scanner() {
   const [address, setAddress] = useState("");
   const [loading, setLoading] = useState(false);
-  const [history, setHistory] = useState<ScanHistory[]>([]);
+  const [results, setResults] = useState<ScanResult[]>([]);
 
   const scan = async (addr?: string) => {
     const target = (addr || address).trim();
@@ -136,13 +128,10 @@ export default function Scanner() {
     setLoading(true);
     setAddress(target);
     try {
-      const result = await inspectContract(target);
-      setHistory((h) => [{ address: target, timestamp: Date.now(), result }, ...h]);
+      const text = await sendMessage("default", `Inspect contract ${target}`);
+      setResults((r) => [{ address: target, timestamp: Date.now(), text }, ...r]);
     } catch (e: any) {
-      setHistory((h) => [
-        { address: target, timestamp: Date.now(), result: { error: e.message || String(e) } },
-        ...h,
-      ]);
+      setResults((r) => [{ address: target, timestamp: Date.now(), error: e.message || String(e) }, ...r]);
     }
     setLoading(false);
     setAddress("");
@@ -152,7 +141,7 @@ export default function Scanner() {
     <div className="max-w-4xl mx-auto space-y-6">
       <div>
         <h1 className="text-2xl font-bold">Contract Scanner</h1>
-        <p className="text-sm text-zinc-500">Analyze any Ethereum smart contract for security signals</p>
+        <p className="text-sm text-zinc-500">Analyze any smart contract for security signals — Ethereum and Solana supported</p>
       </div>
 
       {/* Input */}
@@ -160,7 +149,7 @@ export default function Scanner() {
         <div className="flex gap-2">
           <input
             className="input flex-1 font-mono text-sm"
-            placeholder="0x... (Ethereum contract address)"
+            placeholder="0x... or Solana program address"
             value={address}
             onChange={(e) => setAddress(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && scan()}
@@ -193,36 +182,36 @@ export default function Scanner() {
       </div>
 
       {/* Results */}
-      {history.length > 0 && (
+      {results.length > 0 && (
         <div className="space-y-4">
           <div className="flex items-center justify-between">
             <h3 className="text-sm font-medium text-zinc-400">
-              Scan Results ({history.length})
+              Scan Results ({results.length})
             </h3>
-            {history.length > 1 && (
+            {results.length > 1 && (
               <button
-                onClick={() => setHistory([])}
+                onClick={() => setResults([])}
                 className="text-xs text-zinc-600 hover:text-zinc-400 transition-colors"
               >
                 Clear history
               </button>
             )}
           </div>
-          {history.map((h, i) => (
-            <ResultCard key={`${h.address}-${h.timestamp}`} result={h.result} />
+          {results.map((r) => (
+            <ResultCard key={`${r.address}-${r.timestamp}`} result={r} />
           ))}
         </div>
       )}
 
       {/* Empty state */}
-      {history.length === 0 && !loading && (
+      {results.length === 0 && !loading && (
         <div className="card text-center py-12">
           <svg className="w-12 h-12 mx-auto text-zinc-700 mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
           </svg>
           <p className="text-zinc-500 text-sm font-medium">Paste a contract address to start scanning</p>
           <p className="text-zinc-600 text-xs mt-1.5">
-            Fetches on-chain data from Etherscan &mdash; verification status, proxy detection, compiler version, and balance
+            Powered by Axiom agent &mdash; on-chain analysis via Etherscan V2 and Solana RPC
           </p>
         </div>
       )}
