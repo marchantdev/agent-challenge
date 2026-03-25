@@ -57,7 +57,7 @@ Deep explanations of smart contract vulnerability patterns with real exploit exa
 ## Deployment
 
 **Docker Image:** `ghcr.io/marchantdev/agent-challenge:latest`
-**Live Deployment:** `https://4ZNsog5Cb8GMrqcVAbCGbn4cMhVwj92CkdqUdQ4KG7T1.node.k8s.prd.nos.ci`
+**Live Deployment:** `https://Q8pu8GsXGq23MWAXTaPzV4Vd1PYNWbTPF9G9BspgvNXS.node.k8s.prd.nos.ci`
 
 **Nosana Job Definition:** See `nos_job_def/nosana_eliza_job_definition.json`
 
