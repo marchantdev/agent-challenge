@@ -224,6 +224,26 @@ The badge right-hand color reflects the score band: green (≥80), amber (≥60)
 
 This endpoint enables Axiom to act as infrastructure that other agents can query for protocol safety data.
 
+### Agent-to-Agent Integration
+
+Axiom is designed as composable security infrastructure on Nosana's decentralized compute network. Any agent — whether another ElizaOS plugin, a trading bot, or a monitoring service — can query Axiom's Security Score API before interacting with a DeFi protocol.
+
+This enables agent-to-agent security verification: the trading agent handles execution, Axiom handles safety assessment. Each runs independently on Nosana's decentralized GPU network.
+
+```typescript
+// Example: A DeFi trading agent checks protocol safety before executing
+const response = await fetch('https://axiom.nosana.ci/api/security-score/uniswap');
+const { score, label } = await response.json();
+
+if (score < 60) {
+  console.log(`Protocol rated ${label} (${score}/100) — aborting trade`);
+  return;
+}
+
+// Protocol passes safety check — proceed with trade
+await executeTrade(params);
+```
+
 ---
 
 ## Quick Start
