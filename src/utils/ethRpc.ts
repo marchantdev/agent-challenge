@@ -1,38 +1,43 @@
 /**
- * ethRpc.ts — Ethereum JSON-RPC utilities
+ * ethRpc.ts — Ethereum data utilities via Etherscan V2 API
  *
- * Uses publicnode.com's free public Ethereum RPC endpoint (no API key required).
- * Mirror of solanaRpc.ts design for consistency.
+ * Uses the Etherscan V2 API (api.etherscan.io/v2/api?chainid=1&...)
+ * for all on-chain reads: balances, contract code, ERC-20 metadata,
+ * and source verification. Requires ETHERSCAN_API_KEY in .env.
+ *
+ * Falls back to Ethplorer (free, no key) for wallet token holdings.
  */
 
-const ETH_RPC_URL = process.env.ETH_RPC_URL || "https://ethereum-rpc.publicnode.com";
+const ETHERSCAN_API_KEY = process.env.ETHERSCAN_API_KEY || "";
+const ETHERSCAN_V2_BASE = "https://api.etherscan.io/v2/api";
 
-// ─── Base RPC call ────────────────────────────────────────────────────────────
+// ─── Etherscan V2 request helper ──────────────────────────────────────────────
 
-export async function ethRpc(method: string, params: unknown[] = []): Promise<unknown> {
-  const res = await fetch(ETH_RPC_URL, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ jsonrpc: "2.0", id: 1, method, params }),
+async function etherscanV2(params: Record<string, string>): Promise<any> {
+  const qs = new URLSearchParams({ chainid: "1", ...params, apikey: ETHERSCAN_API_KEY });
+  const res = await fetch(`${ETHERSCAN_V2_BASE}?${qs}`, {
     signal: AbortSignal.timeout(10000),
   });
-  if (!res.ok) throw new Error(`ETH RPC HTTP ${res.status}`);
-  const data = await res.json() as { result?: unknown; error?: { message: string } };
-  if (data.error) throw new Error(`ETH RPC: ${data.error.message}`);
-  return data.result;
+  if (!res.ok) throw new Error(`Etherscan V2 HTTP ${res.status}`);
+  const data = await res.json() as { status?: string; result?: any; message?: string };
+  // Proxy-module calls return result directly (hex strings); account/contract modules use status "1"
+  return data;
 }
 
 // ─── Native balance ───────────────────────────────────────────────────────────
 
 export async function getEthBalance(address: string): Promise<number> {
-  const hex = await ethRpc("eth_getBalance", [address, "latest"]) as string;
-  return parseInt(hex, 16) / 1e18;
+  const data = await etherscanV2({ module: "account", action: "balance", address, tag: "latest" });
+  // result is balance in wei as a decimal string
+  const wei = BigInt(data.result ?? "0");
+  return Number(wei) / 1e18;
 }
 
-// ─── Contract detection ───────────────────────────────────────────────────────
+// ─── Contract detection (via proxy eth_getCode) ──────────────────────────────
 
 export async function isEthContract(address: string): Promise<boolean> {
-  const code = await ethRpc("eth_getCode", [address, "latest"]) as string;
+  const data = await etherscanV2({ module: "proxy", action: "eth_getCode", address, tag: "latest" });
+  const code = data.result as string;
   return Boolean(code && code !== "0x" && code.length > 2);
 }
 
@@ -76,43 +81,40 @@ function decodeAbiString(hex: string): string | null {
   return null;
 }
 
-// ─── ERC-20 metadata via eth_call ─────────────────────────────────────────────
+// ─── ERC-20 metadata via eth_call (Etherscan proxy) ───────────────────────────
 
 export async function getErc20Name(address: string): Promise<string | null> {
   try {
-    const hex = await ethRpc("eth_call", [{ to: address, data: "0x06fdde03" }, "latest"]) as string;
-    return decodeAbiString(hex);
+    const data = await etherscanV2({ module: "proxy", action: "eth_call", to: address, data: "0x06fdde03", tag: "latest" });
+    return decodeAbiString(data.result);
   } catch { return null; }
 }
 
 export async function getErc20Symbol(address: string): Promise<string | null> {
   try {
-    const hex = await ethRpc("eth_call", [{ to: address, data: "0x95d89b41" }, "latest"]) as string;
-    return decodeAbiString(hex);
+    const data = await etherscanV2({ module: "proxy", action: "eth_call", to: address, data: "0x95d89b41", tag: "latest" });
+    return decodeAbiString(data.result);
   } catch { return null; }
 }
 
 export async function getErc20TotalSupply(address: string): Promise<bigint | null> {
   try {
-    const hex = await ethRpc("eth_call", [{ to: address, data: "0x18160ddd" }, "latest"]) as string;
-    if (!hex || hex === "0x") return null;
-    return BigInt(hex);
+    const data = await etherscanV2({ module: "proxy", action: "eth_call", to: address, data: "0x18160ddd", tag: "latest" });
+    if (!data.result || data.result === "0x") return null;
+    return BigInt(data.result);
   } catch { return null; }
 }
 
-// ─── Contract verification via Sourcify ──────────────────────────────────────
+// ─── Contract verification via Etherscan V2 ──────────────────────────────────
 
 export async function checkSourcifyVerification(address: string): Promise<"verified" | "partial" | "unverified"> {
   try {
-    const res = await fetch(
-      `https://sourcify.dev/server/v2/contract/1/${address}`,
-      { signal: AbortSignal.timeout(6000) }
-    );
-    if (!res.ok) return "unverified";
-    const data = await res.json() as { match?: string; runtimeMatch?: string };
-    if (data.match === "match" || data.runtimeMatch === "match") return "verified";
-    if (data.match === "partial" || data.runtimeMatch === "partial") return "partial";
-    return "unverified";
+    const data = await etherscanV2({ module: "contract", action: "getsourcecode", address });
+    if (data.status !== "1" || !Array.isArray(data.result) || data.result.length === 0) return "unverified";
+    const src = data.result[0];
+    // Etherscan returns ABI as "Contract source code not verified" if unverified
+    if (!src.ABI || src.ABI === "Contract source code not verified") return "unverified";
+    return "verified";
   } catch { return "unverified"; }
 }
 
