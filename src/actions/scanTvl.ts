@@ -4,7 +4,7 @@
  */
 
 import type { Action, IAgentRuntime, Memory, State, HandlerCallback, HandlerOptions } from "@elizaos/core";
-import { formatUsd } from "../utils/api.js";
+import { formatUsd, cachedFetch } from "../utils/api.js";
 
 const DEFILLAMA_API = "https://api.llama.fi";
 
@@ -21,9 +21,7 @@ export const scanTvlAction: Action = {
     const text = (message.content?.text || "").toLowerCase();
 
     try {
-      const res = await fetch(`${DEFILLAMA_API}/protocols`);
-      if (!res.ok) throw new Error(`DefiLlama API returned ${res.status}`);
-      const data = await res.json() as any[];
+      const data = await cachedFetch(`${DEFILLAMA_API}/protocols`) as any[];
 
       // Determine filters from message
       const categories = ["lending", "dexes", "liquid staking", "bridge", "cdp", "yield", "derivatives"];

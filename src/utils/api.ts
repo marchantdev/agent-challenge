@@ -12,7 +12,7 @@ export async function cachedFetch(url: string, ttlMs = 300_000): Promise<any> {
   const cached = cache.get(url);
   if (cached && Date.now() < cached.expires) return cached.data;
 
-  const res = await fetch(url);
+  const res = await fetch(url, { signal: AbortSignal.timeout(10_000) });
   if (!res.ok) throw new Error(`HTTP ${res.status}: ${url}`);
   const data = await res.json();
   cache.set(url, { data, expires: Date.now() + ttlMs });

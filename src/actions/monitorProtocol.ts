@@ -8,7 +8,7 @@
  */
 
 import type { Action, IAgentRuntime, Memory, State, HandlerCallback, HandlerOptions } from "@elizaos/core";
-import { formatUsd } from "../utils/api.js";
+import { formatUsd, cachedFetch } from "../utils/api.js";
 
 const DEFILLAMA_API = "https://api.llama.fi";
 
@@ -24,9 +24,7 @@ const watchlist = new Map<string, WatchedProtocol>();
 
 async function resolveProtocol(name: string): Promise<{ name: string; slug: string; tvl: number } | null> {
   try {
-    const res = await fetch(`${DEFILLAMA_API}/protocols`);
-    if (!res.ok) return null;
-    const protocols = await res.json() as any[];
+    const protocols = await cachedFetch(`${DEFILLAMA_API}/protocols`) as any[];
     const match = protocols.find((p: any) =>
       p.name.toLowerCase() === name.toLowerCase() ||
       p.slug.toLowerCase() === name.toLowerCase() ||
@@ -41,9 +39,8 @@ async function resolveProtocol(name: string): Promise<{ name: string; slug: stri
 
 async function fetchCurrentTvl(slug: string): Promise<number | null> {
   try {
-    const res = await fetch(`${DEFILLAMA_API}/protocol/${slug}`);
-    if (!res.ok) return null;
-    const data = await res.json() as any;
+    // Short TTL (60s) for live TVL monitoring — do not use long-lived cache
+    const data = await cachedFetch(`${DEFILLAMA_API}/protocol/${slug}`, 60_000) as any;
     return (data.tvl as number) ?? null;
   } catch {
     return null;
