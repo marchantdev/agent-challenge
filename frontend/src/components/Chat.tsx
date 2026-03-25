@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import type { ChatMessage } from "../lib/types";
 import { sendMessage } from "../lib/api";
 
@@ -11,7 +11,7 @@ const SUGGESTIONS = [
   "Nosana network status",
 ];
 
-function renderInline(text: string): JSX.Element {
+function renderInline(text: string): React.ReactElement {
   const parts = text.split(/(\*\*[^*]+\*\*|`[^`]+`)/g);
   return (
     <>
@@ -29,7 +29,7 @@ function renderInline(text: string): JSX.Element {
 }
 
 function formatMessageContent(text: string) {
-  const parts: JSX.Element[] = [];
+  const parts: React.ReactElement[] = [];
   const lines = text.split("\n");
   let inCodeBlock = false;
   let codeLines: string[] = [];
