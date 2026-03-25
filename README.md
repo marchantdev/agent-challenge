@@ -16,7 +16,7 @@
 │  │             │    │                                │  │
 │  │  Dashboard  │    │  ┌─────────────────────────┐  │  │
 │  │  Chat       │    │  │   Axiom Security Plugin  │  │  │
-│  │  Scanner    │    │  │   9 Custom Actions        │  │  │
+│  │  Scanner    │    │  │   10 Custom Actions       │  │  │
 │  │  Protocols  │    │  │                           │  │  │
 │  │  Nosana     │    │  │   DefiLlama ←──── TVL     │  │  │
 │  │             │    │  │   Etherscan ←──── Chain    │  │  │
@@ -39,7 +39,7 @@
 - **Protocols** — Searchable/sortable table of top 100 DeFi protocols with risk indicators and anomaly badges
 - **Nosana Status** — Deployment health, inference metrics, network node count, GPU types, "Why Decentralized?" section
 
-### 9 Dynamic Actions (Custom ElizaOS Plugin)
+### 10 Dynamic Actions (Custom ElizaOS Plugin)
 
 | Action | Data Source | Description |
 |--------|-----------|-------------|
@@ -52,6 +52,7 @@
 | `AUDIT_RECON` | GitHub API | Recent commits, audit indicators, repo health for any GitHub repository |
 | `ANALYZE_WALLET` | Etherscan + DefiLlama | ETH wallet risk report — token holdings, DeFi exposure, spending patterns |
 | `NOSANA_STATUS` | Process + Nosana API | Live deployment health, memory usage, network stats, infrastructure awareness |
+| `COMPARE_PROTOCOLS` | DefiLlama API | Side-by-side security comparison of two protocols with scored breakdown and AI analysis |
 
 ### Nosana Integration
 
@@ -134,7 +135,7 @@ nosana job post \
 │       ├── lib/            # API client, types
 │       └── styles/         # Tailwind globals
 ├── src/                    # ElizaOS agent plugin
-│   ├── actions/            # 9 custom actions (each in own file)
+│   ├── actions/            # 10 custom actions (each in own file)
 │   ├── types/              # Shared TypeScript interfaces
 │   ├── utils/              # API helpers, formatting
 │   ├── character.ts        # Axiom character definition
