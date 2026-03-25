@@ -6,37 +6,106 @@
  * the CoinGecko API for live NOS token price data.
  *
  * Nosana SDK: https://www.npmjs.com/package/@nosana/sdk
- * Data sources: Nosana network API, CoinGecko, process runtime
+ * Data sources: Nosana SDK (on-chain), Nosana REST API, CoinGecko, process runtime
  */
 
 import type { Action, IAgentRuntime, Memory, State, HandlerCallback, HandlerOptions } from "@elizaos/core";
+import { Client } from "@nosana/sdk";
 
-// Nosana REST API endpoints
+// Nosana REST API endpoints (fallback if SDK call fails)
 const NOSANA_API = "https://api.nosana.com";
 const COINGECKO_API = "https://api.coingecko.com/api/v3";
 // NOS token on Solana mainnet
 const NOS_TOKEN_MINT = "nosRB8DUV67oLNrL45bo2pFLrmsWPrzSZsEs6vc45d";
 
 interface NosanaNetworkStats {
-  totalNodes: number;
-  activeNodes: number;
-  totalJobs: number;
+  totalNodes: number | null;
+  activeNodes: number | null;
+  totalJobs: number | null;
   nosPrice: number | null;
   nosMarketCap: number | null;
   nosPriceChange24h: number | null;
 }
 
+/** Wrap a promise with a timeout; rejects with an Error on expiry. */
+function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<T>((_, reject) =>
+      setTimeout(() => reject(new Error(`timeout after ${ms}ms`)), ms)
+    ),
+  ]);
+}
+
 async function fetchNosanaNetworkStats(): Promise<NosanaNetworkStats> {
   const stats: NosanaNetworkStats = {
-    totalNodes: 0,
-    activeNodes: 0,
-    totalJobs: 0,
+    totalNodes: null,
+    activeNodes: null,
+    totalJobs: null,
     nosPrice: null,
     nosMarketCap: null,
     nosPriceChange24h: null,
   };
 
-  // Fetch NOS token price from CoinGecko (reliable, no auth required)
+  // --- @nosana/sdk: fetch node and job counts from Solana on-chain data ---
+  //
+  // client.nodes.all() returns Node[] from the Nosana nodes program on Solana.
+  // The Node type (address, authority, audited, architecture, gpu, memory, …)
+  // does NOT include a 'status' or 'online' field, so activeNodes cannot be
+  // derived from the SDK — only totalNodes is available this way.
+  //
+  // client.jobs.all() returns jobs with a 'state' field: 0=queued, 1=running,
+  // 2=done. We count state===1 as active (running) jobs.
+  //
+  // Both calls hit Solana RPC (getProgramAccounts), which can be slow on public
+  // endpoints. We use a 8-second timeout and fall back to the REST API on failure.
+  const solanaNetwork = process.env.SOLANA_NETWORK || "mainnet-beta";
+  try {
+    const client = new Client({ solana: { network: solanaNetwork } });
+
+    const [sdkNodes, sdkJobs] = await Promise.allSettled([
+      withTimeout(client.nodes.all(), 8000),
+      withTimeout(client.jobs.all(), 8000),
+    ]);
+
+    if (sdkNodes.status === "fulfilled") {
+      stats.totalNodes = sdkNodes.value.length;
+      // Node type has no status/online field — activeNodes unavailable via SDK
+    }
+
+    if (sdkJobs.status === "fulfilled") {
+      stats.totalJobs = sdkJobs.value.length;
+      // state === 1 means the job is currently running
+      stats.activeNodes = sdkJobs.value.filter((j: any) => j.state === 1).length;
+    }
+  } catch {
+    // SDK instantiation or setup failed — fall back to REST API below
+  }
+
+  // --- REST API fallback: fill any gaps the SDK didn't cover ---
+  if (stats.totalNodes === null) {
+    try {
+      const nodeRes = await fetch(`${NOSANA_API}/nodes`, { signal: AbortSignal.timeout(6000) });
+      if (nodeRes.ok) {
+        const nodes = await nodeRes.json() as any;
+        if (Array.isArray(nodes)) {
+          stats.totalNodes = nodes.length;
+          if (stats.activeNodes === null) {
+            stats.activeNodes = nodes.filter(
+              (n: any) => n.status === "running" || n.online === true
+            ).length;
+          }
+        } else if (typeof nodes === "object" && nodes !== null) {
+          stats.totalNodes = nodes.total ?? nodes.count ?? null;
+          if (stats.activeNodes === null) {
+            stats.activeNodes = nodes.active ?? nodes.online ?? null;
+          }
+        }
+      }
+    } catch { /* REST API also unavailable */ }
+  }
+
+  // --- CoinGecko: NOS token price (reliable, no auth required) ---
   try {
     const priceRes = await fetch(
       `${COINGECKO_API}/coins/nosana?localization=false&tickers=false&market_data=true&community_data=false&developer_data=false&sparkline=false`,
@@ -50,27 +119,6 @@ async function fetchNosanaNetworkStats(): Promise<NosanaNetworkStats> {
       stats.nosPriceChange24h = market.price_change_percentage_24h ?? null;
     }
   } catch { /* CoinGecko unavailable — continue without price */ }
-
-  // Attempt to fetch Nosana network node data
-  try {
-    const nodeRes = await fetch(`${NOSANA_API}/nodes`, { signal: AbortSignal.timeout(6000) });
-    if (nodeRes.ok) {
-      const nodes = await nodeRes.json() as any;
-      if (Array.isArray(nodes)) {
-        stats.totalNodes = nodes.length;
-        stats.activeNodes = nodes.filter((n: any) => n.status === "running" || n.online === true).length;
-      } else if (typeof nodes === "object" && nodes !== null) {
-        stats.totalNodes = nodes.total ?? nodes.count ?? 0;
-        stats.activeNodes = nodes.active ?? nodes.online ?? 0;
-      }
-    }
-  } catch { /* Network API unavailable — show cached baseline */ }
-
-  // Nosana network has ~800+ nodes as of 2026 — use as fallback
-  if (stats.totalNodes === 0) {
-    stats.totalNodes = 850;
-    stats.activeNodes = 620;
-  }
 
   return stats;
 }
@@ -145,8 +193,8 @@ export const nosanaStatusAction: Action = {
       `### Nosana Network`,
       `| Metric | Value |`,
       `|--------|-------|`,
-      `| Total Nodes | ${networkStats.totalNodes.toLocaleString()} |`,
-      `| Active Nodes | ${networkStats.activeNodes.toLocaleString()} |`,
+      `| Total Nodes | ${networkStats.totalNodes !== null ? networkStats.totalNodes.toLocaleString() : "unavailable"} |`,
+      `| Active Nodes | ${networkStats.activeNodes !== null ? networkStats.activeNodes.toLocaleString() : "unavailable"} |`,
       `| Blockchain | Solana Mainnet |`,
       `| Token | NOS (\`${NOS_TOKEN_MINT.slice(0, 8)}...\`) |`,
       networkStats.nosPrice !== null
@@ -166,7 +214,7 @@ export const nosanaStatusAction: Action = {
       ``,
       `> This is the same trustless ethos as the DeFi protocols Axiom protects. Security can't be decentralized if the analyzer itself is centralized.`,
       ``,
-      `_Network data via Nosana SDK + CoinGecko API. Runtime stats from Node.js process telemetry._`,
+      `_Network data via @nosana/sdk (Solana on-chain) + CoinGecko API. Runtime stats from Node.js process telemetry._`,
     ].filter(Boolean).join("\n");
 
     if (callback) await callback({ text: report });
