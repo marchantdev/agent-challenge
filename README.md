@@ -16,7 +16,7 @@
 │  │             │    │                                │  │
 │  │  Dashboard  │    │  ┌─────────────────────────┐  │  │
 │  │  Chat       │    │  │   Axiom Security Plugin  │  │  │
-│  │  Scanner    │    │  │   8 Custom Actions        │  │  │
+│  │  Scanner    │    │  │   9 Custom Actions        │  │  │
 │  │  Protocols  │    │  │                           │  │  │
 │  │  Nosana     │    │  │   DefiLlama ←──── TVL     │  │  │
 │  │             │    │  │   Etherscan ←──── Chain    │  │  │
@@ -39,7 +39,7 @@
 - **Protocols** — Searchable/sortable table of top 100 DeFi protocols with risk indicators and anomaly badges
 - **Nosana Status** — Deployment health, inference metrics, network node count, GPU types, "Why Decentralized?" section
 
-### 8 Dynamic Actions (Custom ElizaOS Plugin)
+### 9 Dynamic Actions (Custom ElizaOS Plugin)
 
 | Action | Data Source | Description |
 |--------|-----------|-------------|
@@ -47,9 +47,10 @@
 | `EXPLAIN_VULNERABILITY` | Curated DB + examples | Reentrancy, flash loans, oracle manipulation, bridge exploits, access control |
 | `SCAN_DEFI_TVL` | DefiLlama API | Live TVL rankings with category/chain filters and anomaly detection |
 | `INSPECT_CONTRACT` | Etherscan API | Balance, verification, proxy detection, compiler version, deployer info |
-| `EXPLOIT_HISTORY` | Curated DB (25+) | Filterable exploit database by chain, category, technique, and amount |
+| `EXPLOIT_HISTORY` | DeFiLlama Hacks API (478+ records) | Live exploit database — 1h cache, filters by chain/category/technique/year |
 | `SCAN_BOUNTIES` | Immunefi API | Live bug bounty program scanner with reward tiers |
 | `AUDIT_RECON` | GitHub API | Recent commits, audit indicators, repo health for any GitHub repository |
+| `ANALYZE_WALLET` | Etherscan + DefiLlama | ETH wallet risk report — token holdings, DeFi exposure, spending patterns |
 | `NOSANA_STATUS` | Process + Nosana API | Live deployment health, memory usage, network stats, infrastructure awareness |
 
 ### Nosana Integration
@@ -133,7 +134,7 @@ nosana job post \
 │       ├── lib/            # API client, types
 │       └── styles/         # Tailwind globals
 ├── src/                    # ElizaOS agent plugin
-│   ├── actions/            # 8 custom actions (each in own file)
+│   ├── actions/            # 9 custom actions (each in own file)
 │   ├── types/              # Shared TypeScript interfaces
 │   ├── utils/              # API helpers, formatting
 │   ├── character.ts        # Axiom character definition
@@ -178,7 +179,7 @@ Axiom runs on Nosana's decentralized GPU network — a Solana-based compute mark
 | LLM | Qwen3.5-27B-AWQ-4bit |
 | Frontend | React 19 + Vite 6 + TypeScript + Tailwind CSS |
 | Compute | Nosana decentralized GPU (RTX 3090) |
-| APIs | DefiLlama, Etherscan, GitHub, Immunefi, Nosana |
+| APIs | DefiLlama, DeFiLlama Hacks, Etherscan, GitHub, Immunefi, Nosana |
 | Container | Docker (multi-stage build) |
 | CI/CD | GitHub Actions |
 
