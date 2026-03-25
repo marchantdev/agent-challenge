@@ -13,6 +13,8 @@ import { exploitHistoryAction } from "../actions/exploitHistory.ts";
 import { scanBountiesAction } from "../actions/scanBounties.ts";
 import { auditReconAction } from "../actions/auditRecon.ts";
 import { nosanaStatusAction } from "../actions/nosanaStatus.ts";
+import { analyzeWalletAction } from "../actions/analyzeWallet.ts";
+import { monitorProtocolAction } from "../actions/monitorProtocol.ts";
 
 // Mock runtime and memory
 const mockRuntime = {} as any;
@@ -76,6 +78,46 @@ describe("Action Validation (keyword triggers)", () => {
   it("NOSANA_STATUS triggers on 'infrastructure'", async () => {
     expect(await nosanaStatusAction.validate!(mockRuntime, makeMemory("What infrastructure do you use?"))).toBe(true);
   });
+
+  it("ANALYZE_WALLET triggers on 'analyze wallet' with ETH address", async () => {
+    expect(await analyzeWalletAction.validate!(mockRuntime, makeMemory("Analyze wallet 0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D"))).toBe(true);
+  });
+
+  it("ANALYZE_WALLET triggers on 'wallet risk'", async () => {
+    expect(await analyzeWalletAction.validate!(mockRuntime, makeMemory("wallet risk for this address 0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D"))).toBe(true);
+  });
+
+  it("ANALYZE_WALLET triggers on 'check portfolio'", async () => {
+    expect(await analyzeWalletAction.validate!(mockRuntime, makeMemory("check portfolio 0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D"))).toBe(true);
+  });
+
+  it("ANALYZE_WALLET triggers on bare ETH address", async () => {
+    expect(await analyzeWalletAction.validate!(mockRuntime, makeMemory("0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D"))).toBe(true);
+  });
+
+  it("ANALYZE_WALLET does not trigger on unrelated text", async () => {
+    expect(await analyzeWalletAction.validate!(mockRuntime, makeMemory("What is the weather today?"))).toBe(false);
+  });
+
+  it("MONITOR_PROTOCOL triggers on 'monitor Aave'", async () => {
+    expect(await monitorProtocolAction.validate!(mockRuntime, makeMemory("monitor Aave"))).toBe(true);
+  });
+
+  it("MONITOR_PROTOCOL triggers on 'watch Compound'", async () => {
+    expect(await monitorProtocolAction.validate!(mockRuntime, makeMemory("watch Compound"))).toBe(true);
+  });
+
+  it("MONITOR_PROTOCOL triggers on 'check watchlist'", async () => {
+    expect(await monitorProtocolAction.validate!(mockRuntime, makeMemory("check watchlist"))).toBe(true);
+  });
+
+  it("MONITOR_PROTOCOL triggers on 'monitored protocols'", async () => {
+    expect(await monitorProtocolAction.validate!(mockRuntime, makeMemory("show me monitored protocols"))).toBe(true);
+  });
+
+  it("MONITOR_PROTOCOL does not trigger on unrelated text", async () => {
+    expect(await monitorProtocolAction.validate!(mockRuntime, makeMemory("hello world"))).toBe(false);
+  });
 });
 
 describe("Action metadata", () => {
@@ -88,10 +130,12 @@ describe("Action metadata", () => {
     scanBountiesAction,
     auditReconAction,
     nosanaStatusAction,
+    analyzeWalletAction,
+    monitorProtocolAction,
   ];
 
-  it("all 8 actions are defined", () => {
-    expect(actions).toHaveLength(8);
+  it("all 10 actions are defined", () => {
+    expect(actions).toHaveLength(10);
   });
 
   it("all actions have name, description, and handler", () => {

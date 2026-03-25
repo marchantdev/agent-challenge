@@ -6,7 +6,8 @@
   "scripts": {
     "build": "tsc",
     "start": "elizaos start --character ./characters/agent.character.json",
-    "dev": "elizaos dev --character ./characters/agent.character.json"
+    "dev": "elizaos dev --character ./characters/agent.character.json",
+    "test": "vitest run"
   },
   "dependencies": {
     "@elizaos/core": "^1.0.0",
@@ -18,6 +19,7 @@
   "devDependencies": {
     "@elizaos/cli": "^1.0.0",
     "@types/node": "^22.0.0",
-    "typescript": "^5.0.0"
+    "typescript": "^5.0.0",
+    "vitest": "^3.2.4"
   }
 }

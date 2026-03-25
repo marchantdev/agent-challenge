@@ -33,7 +33,7 @@ export function formatUsd(n: number): string {
 
 export function extractProtocolName(text: string): string {
   const nameMatch = text.match(
-    /(?:risk|assess|analyze|security|safe|check)\s+(?:of\s+)?(?:the\s+)?([A-Za-z0-9\s.]+?)(?:\s+protocol|\s+v\d|\s*$)/i
+    /(?:risk|assess|analyze|security|safe|check)\s+(?:(?:of|the|risk|about)\s+)*([A-Za-z0-9][A-Za-z0-9 .]*?)(?:\s+protocol|\s*$)/i
   ) || text.match(/(?:is\s+)([A-Za-z0-9\s.]+?)(?:\s+safe|\s+risky|\s+secure)/i);
 
   return nameMatch
