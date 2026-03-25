@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
-import type { NosanaHealth, NosanaMetrics } from "../lib/types";
-import { fetchHealth, fetchMetrics } from "../lib/api";
+import type { NosanaHealth, NosanaMetrics, NosanaNetwork } from "../lib/types";
+import { fetchHealth, fetchMetrics, fetchNosanaNetwork, formatNumber } from "../lib/api";
 
 function formatUptime(secs: number): string {
   const d = Math.floor(secs / 86400);
@@ -24,11 +24,11 @@ function StatusDot({ status }: { status: string }) {
   );
 }
 
-function MetricCard({ label, value, unit }: { label: string; value: string | number; unit?: string }) {
+function MetricCard({ label, value, unit, accent }: { label: string; value: string | number; unit?: string; accent?: string }) {
   return (
     <div className="card">
       <p className="text-xs text-zinc-500 uppercase tracking-wider">{label}</p>
-      <p className="text-xl font-semibold mt-1 font-mono">
+      <p className={`text-xl font-semibold mt-1 font-mono ${accent || ""}`}>
         {value}
         {unit && <span className="text-sm text-zinc-500 ml-1">{unit}</span>}
       </p>
@@ -39,23 +39,34 @@ function MetricCard({ label, value, unit }: { label: string; value: string | num
 export default function NosanaStatus() {
   const [health, setHealth] = useState<NosanaHealth | null>(null);
   const [metrics, setMetrics] = useState<NosanaMetrics | null>(null);
-  const [networkStats, setNetworkStats] = useState<any>(null);
+  const [network, setNetwork] = useState<NosanaNetwork | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
 
-  useEffect(() => {
-    fetchHealth().then(setHealth);
-    fetchMetrics().then(setMetrics);
-    // Try fetching Nosana network stats
-    fetch("https://dashboard.nosana.com/api/nodes")
-      .then((r) => r.ok ? r.json() : null)
-      .then(setNetworkStats)
-      .catch(() => setNetworkStats(null));
-  }, []);
+  const loadData = () => {
+    setRefreshing(true);
+    Promise.all([
+      fetchHealth().then(setHealth),
+      fetchMetrics().then(setMetrics),
+      fetchNosanaNetwork().then(setNetwork),
+    ]).finally(() => setRefreshing(false));
+  };
+
+  useEffect(() => { loadData(); }, []);
 
   return (
     <div className="max-w-5xl mx-auto space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold">Nosana Infrastructure</h1>
-        <p className="text-sm text-zinc-500">Decentralized GPU compute — deployment health & network status</p>
+      <div className="flex items-end justify-between">
+        <div>
+          <h1 className="text-2xl font-bold">Nosana Infrastructure</h1>
+          <p className="text-sm text-zinc-500">Decentralized GPU compute &mdash; deployment health & network status</p>
+        </div>
+        <button
+          onClick={loadData}
+          disabled={refreshing}
+          className="btn-secondary text-xs disabled:opacity-50"
+        >
+          {refreshing ? "Refreshing..." : "Refresh"}
+        </button>
       </div>
 
       {/* Agent Health */}
@@ -73,8 +84,8 @@ export default function NosanaStatus() {
         </div>
 
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <MetricCard label="Uptime" value={health ? formatUptime(health.uptimeSeconds) : "—"} />
-          <MetricCard label="Inference Latency" value={health?.inferenceLatencyMs || "—"} unit="ms" />
+          <MetricCard label="Uptime" value={health ? formatUptime(health.uptimeSeconds) : "\u2014"} />
+          <MetricCard label="Inference Latency" value={health?.inferenceLatencyMs || "\u2014"} unit="ms" accent={health && health.inferenceLatencyMs < 500 ? "text-emerald-400" : ""} />
           <MetricCard label="Actions Triggered" value={health?.actionsTriggered || 0} />
           <MetricCard label="Model" value={health?.model || "Qwen3.5-27B"} />
         </div>
@@ -84,32 +95,19 @@ export default function NosanaStatus() {
       <div className="card">
         <h3 className="font-medium mb-3">Deployment Configuration</h3>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
-          <div className="flex justify-between">
-            <span className="text-zinc-500">Node ID</span>
-            <span className="font-mono text-xs">{health?.nosanaNode || "—"}</span>
-          </div>
-          <div className="flex justify-between">
-            <span className="text-zinc-500">GPU Market</span>
-            <span>NVIDIA RTX 3090</span>
-          </div>
-          <div className="flex justify-between">
-            <span className="text-zinc-500">Container</span>
-            <span className="font-mono text-xs">ghcr.io/marchantdev/agent-challenge:latest</span>
-          </div>
-          <div className="flex justify-between">
-            <span className="text-zinc-500">Framework</span>
-            <span>ElizaOS v1 + Custom Plugin</span>
-          </div>
-          <div className="flex justify-between">
-            <span className="text-zinc-500">Port</span>
-            <span className="font-mono">3000</span>
-          </div>
-          <div className="flex justify-between">
-            <span className="text-zinc-500">Last Heartbeat</span>
-            <span className="font-mono text-xs">
-              {health?.lastHeartbeat ? new Date(health.lastHeartbeat).toLocaleString() : "—"}
-            </span>
-          </div>
+          {[
+            ["Node ID", health?.nosanaNode || "\u2014", true],
+            ["GPU Market", "NVIDIA RTX 3090", false],
+            ["Container", "ghcr.io/marchantdev/agent-challenge:latest", true],
+            ["Framework", "ElizaOS v1 + Custom Plugin", false],
+            ["Ports", "3000 (Agent) / 8080 (Frontend)", true],
+            ["Last Heartbeat", health?.lastHeartbeat ? new Date(health.lastHeartbeat).toLocaleString() : "\u2014", true],
+          ].map(([label, value, mono]) => (
+            <div key={label as string} className="flex justify-between py-1 border-b border-zinc-800/50 last:border-0">
+              <span className="text-zinc-500">{label}</span>
+              <span className={mono ? "font-mono text-xs text-zinc-300" : "text-zinc-300"}>{value}</span>
+            </div>
+          ))}
         </div>
       </div>
 
@@ -118,30 +116,33 @@ export default function NosanaStatus() {
         <div className="card">
           <h3 className="font-medium mb-3">Request Metrics</h3>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
-            <MetricCard label="Total Requests" value={metrics.requestsTotal} />
+            <MetricCard label="Total Requests" value={formatNumber(metrics.requestsTotal)} />
             <MetricCard label="Avg Response" value={metrics.avgResponseTimeMs} unit="ms" />
-            <MetricCard label="Error Rate" value={`${(metrics.errorRate * 100).toFixed(1)}%`} />
+            <MetricCard label="Error Rate" value={`${(metrics.errorRate * 100).toFixed(1)}%`} accent={metrics.errorRate < 0.05 ? "text-emerald-400" : "text-red-400"} />
             <MetricCard label="Protocols Monitored" value={metrics.protocolsMonitored} />
           </div>
 
           {Object.keys(metrics.requestsByAction).length > 0 && (
             <div>
-              <h4 className="text-xs text-zinc-500 uppercase mb-2">Requests by Action</h4>
+              <h4 className="text-xs text-zinc-500 uppercase tracking-wider mb-2">Requests by Action</h4>
               <div className="space-y-1.5">
                 {Object.entries(metrics.requestsByAction)
                   .sort(([, a], [, b]) => b - a)
-                  .map(([action, count]) => (
-                    <div key={action} className="flex items-center gap-3">
-                      <span className="text-xs text-zinc-400 w-44 font-mono truncate">{action}</span>
-                      <div className="flex-1 h-4 bg-zinc-800 rounded overflow-hidden">
-                        <div
-                          className="h-full bg-emerald-600/50 rounded"
-                          style={{ width: `${(count / metrics.requestsTotal) * 100}%` }}
-                        />
+                  .map(([action, count]) => {
+                    const pct = metrics.requestsTotal > 0 ? (count / metrics.requestsTotal) * 100 : 0;
+                    return (
+                      <div key={action} className="flex items-center gap-3">
+                        <span className="text-xs text-zinc-400 w-44 font-mono truncate">{action}</span>
+                        <div className="flex-1 h-4 bg-zinc-800 rounded overflow-hidden">
+                          <div
+                            className="h-full bg-gradient-to-r from-emerald-600/50 to-emerald-500/30 rounded"
+                            style={{ width: `${pct}%` }}
+                          />
+                        </div>
+                        <span className="text-xs text-zinc-300 w-12 text-right font-mono">{count}</span>
                       </div>
-                      <span className="text-xs text-zinc-300 w-12 text-right font-mono">{count}</span>
-                    </div>
-                  ))}
+                    );
+                  })}
               </div>
             </div>
           )}
@@ -151,12 +152,21 @@ export default function NosanaStatus() {
       {/* Nosana Network */}
       <div className="card">
         <h3 className="font-medium mb-3">Nosana Network</h3>
-        <p className="text-sm text-zinc-400 mb-3">
-          Axiom runs on Nosana's decentralized GPU network — a Solana-based compute marketplace.
+        <p className="text-sm text-zinc-400 mb-4">
+          Axiom runs on Nosana's decentralized GPU network &mdash; a Solana-based compute marketplace.
           Security infrastructure shouldn't depend on centralized cloud that can be compromised,
           censored, or rate-limited.
         </p>
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-3 text-sm">
+
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+          <div className="bg-zinc-800 rounded-lg p-3 text-center">
+            <p className="text-zinc-500 text-xs">Total Nodes</p>
+            <p className="font-bold text-lg mt-1 font-mono text-emerald-400">{network ? formatNumber(network.totalNodes) : "\u2014"}</p>
+          </div>
+          <div className="bg-zinc-800 rounded-lg p-3 text-center">
+            <p className="text-zinc-500 text-xs">Active Jobs</p>
+            <p className="font-bold text-lg mt-1 font-mono">{network ? formatNumber(network.activeJobs) : "\u2014"}</p>
+          </div>
           <div className="bg-zinc-800 rounded-lg p-3 text-center">
             <p className="text-zinc-500 text-xs">Network</p>
             <p className="font-medium mt-1">Solana Mainnet</p>
@@ -165,13 +175,36 @@ export default function NosanaStatus() {
             <p className="text-zinc-500 text-xs">Token</p>
             <p className="font-medium mt-1">NOS</p>
           </div>
-          <div className="bg-zinc-800 rounded-lg p-3 text-center">
-            <p className="text-zinc-500 text-xs">Compute Type</p>
-            <p className="font-medium mt-1">GPU Inference</p>
-          </div>
         </div>
-        <div className="mt-3 text-xs text-zinc-600">
-          Data from Nosana Dashboard API. Refresh for latest stats.
+
+        {network && network.gpuTypes.length > 0 && (
+          <div>
+            <h4 className="text-xs text-zinc-500 uppercase tracking-wider mb-2">Available GPU Types</h4>
+            <div className="flex flex-wrap gap-2">
+              {network.gpuTypes.map((gpu) => (
+                <span key={gpu} className="badge-info text-xs">{gpu}</span>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Why Decentralized */}
+      <div className="card border-emerald-800/30 bg-emerald-950/5">
+        <h3 className="font-medium text-emerald-400 mb-2">Why Decentralized Security Infrastructure?</h3>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm text-zinc-400">
+          <div>
+            <p className="font-medium text-zinc-200 mb-1">Censorship Resistant</p>
+            <p>No single entity can shut down or restrict Axiom's security analysis. The agent runs across a distributed network of GPU nodes.</p>
+          </div>
+          <div>
+            <p className="font-medium text-zinc-200 mb-1">Trust-Minimized</p>
+            <p>Security tooling running on centralized cloud can be compromised at the infrastructure level. Nosana eliminates this single point of failure.</p>
+          </div>
+          <div>
+            <p className="font-medium text-zinc-200 mb-1">Always Available</p>
+            <p>GPU compute is sourced from a marketplace of independent node operators. If one node goes down, the job migrates automatically.</p>
+          </div>
         </div>
       </div>
     </div>

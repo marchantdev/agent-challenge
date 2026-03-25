@@ -29,9 +29,12 @@ export interface ContractInfo {
   balance: string;
   txCount: number;
   verified: boolean;
+  contractName: string;
   deployer?: string;
   age?: string;
   isProxy?: boolean;
+  implementation?: string;
+  compilerVersion?: string;
 }
 
 export interface ScanResult {
@@ -66,4 +69,13 @@ export interface NosanaMetrics {
   protocolsMonitored: number;
 }
 
+export interface NosanaNetwork {
+  totalNodes: number;
+  activeJobs: number;
+  gpuTypes: string[];
+  networkVersion: string;
+}
+
 export type View = "dashboard" | "chat" | "scanner" | "protocols" | "nosana";
+
+export type RiskLevel = "Critical" | "High" | "Medium" | "Low" | "Info";

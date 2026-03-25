@@ -85,7 +85,7 @@ export default function Layout({
         <div className="mt-auto text-[8px] text-zinc-700 text-center leading-tight">
           Axiom
           <br />
-          v0.2
+          v0.3
         </div>
       </nav>
 

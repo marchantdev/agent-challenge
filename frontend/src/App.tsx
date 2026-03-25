@@ -19,7 +19,7 @@ export default function App() {
       case "scanner":
         return <Scanner />;
       case "protocols":
-        return <Protocols />;
+        return <Protocols onNavigate={setView} />;
       case "nosana":
         return <NosanaStatus />;
     }
