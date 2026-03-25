@@ -23,6 +23,7 @@
 
 import { ModelType } from "@elizaos/core";
 import type { Action, IAgentRuntime, Memory, State, HandlerCallback, HandlerOptions } from "@elizaos/core";
+import { CURATED_EXPLOITS } from "../data/curatedExploits.js";
 
 interface Exploit {
   name: string;
@@ -35,35 +36,58 @@ interface Exploit {
 let hacksCache: { data: Exploit[]; fetchedAt: number } | null = null;
 const CACHE_TTL_MS = 60 * 60 * 1000;
 
-async function fetchRecentExploits(vulnType: string): Promise<Exploit[]> {
-  if (!hacksCache || Date.now() - hacksCache.fetchedAt > CACHE_TTL_MS) {
-    try {
-      const res = await fetch("https://api.llama.fi/hacks", { signal: AbortSignal.timeout(8000) });
-      if (res.ok) {
-        const raw = await res.json() as Array<{
-          date: number; name: string; technique?: string; amount?: number;
-        }>;
-        hacksCache = {
-          fetchedAt: Date.now(),
-          data: raw
-            .filter((e) => e.amount && e.amount > 0)
-            .map((e) => ({
-              name: e.name,
-              date: new Date(e.date * 1000).toISOString().slice(0, 10),
-              amount: e.amount ?? 0,
-              technique: e.technique ?? "unknown",
-            }))
-            .sort((a, b) => b.amount - a.amount),
-        };
-      }
-    } catch { /* ignore fetch errors — LLM will still generate from its own knowledge */ }
+/** Load exploits from DeFiLlama (live) or curated dataset (fallback) */
+async function loadExploits(): Promise<Exploit[]> {
+  if (hacksCache && Date.now() - hacksCache.fetchedAt < CACHE_TTL_MS) {
+    return hacksCache.data;
   }
 
-  if (!hacksCache) return [];
+  try {
+    const res = await fetch("https://api.llama.fi/hacks", { signal: AbortSignal.timeout(8000) });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+    const text = await res.text();
+    // Paywall detection: valid response is a JSON array
+    if (!text.trimStart().startsWith("[")) {
+      throw new Error("API returned non-array response (possible paywall)");
+    }
+
+    const raw = JSON.parse(text) as Array<{
+      date: number; name: string; technique?: string; amount?: number;
+    }>;
+    if (!Array.isArray(raw) || raw.length === 0) throw new Error("Empty response");
+
+    const data = raw
+      .filter((e) => e.amount && e.amount > 0)
+      .map((e) => ({
+        name: e.name,
+        date: new Date(e.date * 1000).toISOString().slice(0, 10),
+        amount: e.amount ?? 0,
+        technique: e.technique ?? "unknown",
+      }))
+      .sort((a, b) => b.amount - a.amount);
+
+    hacksCache = { fetchedAt: Date.now(), data };
+    return data;
+  } catch {
+    // Fallback to curated dataset
+    const fallback = CURATED_EXPLOITS.map((e) => ({
+      name: e.name,
+      date: e.date,
+      amount: e.amount,
+      technique: e.technique,
+    })).sort((a, b) => b.amount - a.amount);
+    hacksCache = { fetchedAt: Date.now(), data: fallback };
+    return fallback;
+  }
+}
+
+async function fetchRecentExploits(vulnType: string): Promise<Exploit[]> {
+  const allExploits = await loadExploits();
 
   // Filter exploits relevant to the vulnerability type
   const keywords = vulnType.toLowerCase().split(/\s+/);
-  return hacksCache.data
+  return allExploits
     .filter((e) => keywords.some((k) => e.technique.toLowerCase().includes(k) || e.name.toLowerCase().includes(k)))
     .slice(0, 5);
 }

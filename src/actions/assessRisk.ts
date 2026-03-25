@@ -134,8 +134,7 @@ async function fetchProtocolData(name: string): Promise<any | null> {
   } catch { return null; }
 }
 
-/** Export for use by the Security Score API endpoint in server.ts */
-export { computeSecurityScore };
+/* computeSecurityScore is already exported inline at its definition */
 
 function assessRiskLevel(tvl: number, change1d: number | null, audits: number, chains: number): string[] {
   const risks: string[] = [];

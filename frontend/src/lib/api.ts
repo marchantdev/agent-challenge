@@ -34,33 +34,59 @@ export async function fetchProtocols(): Promise<Protocol[]> {
 }
 
 // --- DeFi Rekt / Exploit data ---
+// Curated exploit database — updated March 2026
+// Used as primary dataset for dashboard and as fallback when DefiLlama is paywalled
 
 const KNOWN_EXPLOITS: Exploit[] = [
-  { name: "Ronin Bridge", date: "2022-03-23", amount: 625_000_000, chain: "Ethereum", technique: "Validator key compromise" },
-  { name: "Poly Network", date: "2021-08-10", amount: 611_000_000, chain: "Multi", technique: "Cross-chain relay exploit" },
-  { name: "Wormhole", date: "2022-02-02", amount: 326_000_000, chain: "Solana", technique: "Signature verification bypass" },
+  // 2024-2025
+  { name: "WazirX", date: "2024-07-18", amount: 235_000_000, chain: "Ethereum", technique: "Multisig compromise" },
+  { name: "Radiant Capital", date: "2024-10-16", amount: 50_000_000, chain: "Multi", technique: "Private key compromise" },
+  { name: "Munchables", date: "2024-03-26", amount: 62_500_000, chain: "Blast", technique: "Insider / rogue developer" },
+  { name: "PlayDapp", date: "2024-02-09", amount: 32_350_000, chain: "Ethereum", technique: "Private key compromise" },
+  { name: "Hedgey Finance", date: "2024-04-19", amount: 44_700_000, chain: "Ethereum", technique: "Input validation flaw" },
+  { name: "UwU Lend", date: "2024-06-10", amount: 19_400_000, chain: "Ethereum", technique: "Oracle manipulation" },
+  { name: "Sonne Finance", date: "2024-05-15", amount: 20_000_000, chain: "Optimism", technique: "Donation attack (empty market)" },
+  { name: "Socket", date: "2024-01-16", amount: 3_300_000, chain: "Ethereum", technique: "Approval exploit via bridge aggregator" },
+  { name: "Abracadabra / MIM", date: "2024-01-30", amount: 6_500_000, chain: "Ethereum", technique: "Oracle manipulation" },
+  // 2023
   { name: "Mixin Network", date: "2023-09-23", amount: 200_000_000, chain: "Multi", technique: "Cloud provider breach" },
   { name: "Euler Finance", date: "2023-03-13", amount: 197_000_000, chain: "Ethereum", technique: "Donation attack" },
-  { name: "Nomad Bridge", date: "2022-08-01", amount: 190_000_000, chain: "Ethereum", technique: "Initialization bug" },
-  { name: "Beanstalk", date: "2022-04-17", amount: 182_000_000, chain: "Ethereum", technique: "Flash loan governance" },
-  { name: "Cream Finance", date: "2021-10-27", amount: 130_000_000, chain: "Ethereum", technique: "Flash loan + oracle manipulation" },
   { name: "Multichain", date: "2023-07-06", amount: 126_000_000, chain: "Multi", technique: "MPC key compromise" },
-  { name: "Badger DAO", date: "2021-12-02", amount: 120_000_000, chain: "Ethereum", technique: "Frontend injection" },
-  { name: "Mango Markets", date: "2022-10-11", amount: 114_000_000, chain: "Solana", technique: "Oracle manipulation" },
-  { name: "Orbit Chain", date: "2023-12-31", amount: 81_500_000, chain: "Multi", technique: "Bridge signer compromise" },
+  { name: "Atomic Wallet", date: "2023-06-03", amount: 100_000_000, chain: "Multi", technique: "Private key extraction" },
   { name: "Curve Finance", date: "2023-07-30", amount: 73_500_000, chain: "Ethereum", technique: "Vyper compiler reentrancy" },
-  { name: "Radiant Capital", date: "2024-10-16", amount: 50_000_000, chain: "Multi", technique: "Private key compromise" },
+  { name: "Stake.com", date: "2023-09-04", amount: 41_300_000, chain: "Multi", technique: "Private key compromise" },
+  { name: "CoinEx", date: "2023-09-12", amount: 70_000_000, chain: "Multi", technique: "Hot wallet compromise" },
+  { name: "Orbit Chain", date: "2023-12-31", amount: 81_500_000, chain: "Multi", technique: "Bridge signer compromise" },
   { name: "KyberSwap", date: "2023-11-22", amount: 48_800_000, chain: "Multi", technique: "Precision manipulation" },
   { name: "BonqDAO", date: "2023-02-01", amount: 120_000_000, chain: "Polygon", technique: "Oracle manipulation" },
-  { name: "Harmony Bridge", date: "2022-06-23", amount: 100_000_000, chain: "Multi", technique: "Multisig key theft" },
-  { name: "Wintermute", date: "2022-09-20", amount: 160_000_000, chain: "Ethereum", technique: "Vanity address exploit" },
   { name: "Platypus Finance", date: "2023-02-16", amount: 8_500_000, chain: "Avalanche", technique: "Flash loan + staking logic" },
-  { name: "Atomic Wallet", date: "2023-06-03", amount: 100_000_000, chain: "Multi", technique: "Private key extraction" },
-  { name: "dForce", date: "2020-04-19", amount: 25_000_000, chain: "Ethereum", technique: "ERC-777 reentrancy" },
-  { name: "Yearn Finance", date: "2021-02-04", amount: 11_000_000, chain: "Ethereum", technique: "Flash loan + misconfiguration" },
   { name: "Sentiment", date: "2023-04-04", amount: 1_000_000, chain: "Arbitrum", technique: "Read-only reentrancy" },
-  { name: "Level Finance", date: "2023-05-01", amount: 1_100_000, chain: "BSC", technique: "Referral reward exploit" },
   { name: "Exactly Protocol", date: "2023-08-18", amount: 7_200_000, chain: "Optimism", technique: "Permit + liquidation logic" },
+  { name: "Level Finance", date: "2023-05-01", amount: 1_100_000, chain: "BSC", technique: "Referral reward exploit" },
+  { name: "Yearn Finance v2", date: "2023-04-13", amount: 11_600_000, chain: "Ethereum", technique: "Misconfigured yUSDT" },
+  // 2022
+  { name: "Ronin Bridge", date: "2022-03-23", amount: 625_000_000, chain: "Ethereum", technique: "Validator key compromise" },
+  { name: "BNB Bridge", date: "2022-10-06", amount: 586_000_000, chain: "BSC", technique: "Proof forgery (IAVL tree)" },
+  { name: "FTX", date: "2022-11-11", amount: 477_000_000, chain: "Multi", technique: "Insider theft / unauthorized transfers" },
+  { name: "Wormhole", date: "2022-02-02", amount: 326_000_000, chain: "Solana", technique: "Signature verification bypass" },
+  { name: "Nomad Bridge", date: "2022-08-01", amount: 190_000_000, chain: "Ethereum", technique: "Initialization bug (replica root)" },
+  { name: "Beanstalk", date: "2022-04-17", amount: 182_000_000, chain: "Ethereum", technique: "Flash loan governance" },
+  { name: "Wintermute", date: "2022-09-20", amount: 160_000_000, chain: "Ethereum", technique: "Vanity address exploit (Profanity)" },
+  { name: "Harmony Bridge", date: "2022-06-23", amount: 100_000_000, chain: "Multi", technique: "Multisig key theft" },
+  { name: "Mango Markets", date: "2022-10-11", amount: 114_000_000, chain: "Solana", technique: "Oracle manipulation" },
+  { name: "Cashio", date: "2022-03-23", amount: 52_000_000, chain: "Solana", technique: "Infinite mint (collateral validation bypass)" },
+  // 2021
+  { name: "Poly Network", date: "2021-08-10", amount: 611_000_000, chain: "Multi", technique: "Cross-chain relay exploit" },
+  { name: "Cream Finance", date: "2021-10-27", amount: 130_000_000, chain: "Ethereum", technique: "Flash loan + oracle manipulation" },
+  { name: "Vulcan Forged", date: "2021-12-13", amount: 135_000_000, chain: "Polygon", technique: "Private key compromise" },
+  { name: "Badger DAO", date: "2021-12-02", amount: 120_000_000, chain: "Ethereum", technique: "Frontend injection (Cloudflare API key)" },
+  { name: "Compound", date: "2021-09-29", amount: 80_000_000, chain: "Ethereum", technique: "Governance proposal bug (excess COMP)" },
+  { name: "Yearn Finance", date: "2021-02-04", amount: 11_000_000, chain: "Ethereum", technique: "Flash loan + misconfiguration" },
+  { name: "Pancake Bunny", date: "2021-05-19", amount: 45_000_000, chain: "BSC", technique: "Flash loan + price manipulation" },
+  // 2020
+  { name: "dForce / Lendf.Me", date: "2020-04-19", amount: 25_000_000, chain: "Ethereum", technique: "ERC-777 reentrancy" },
+  { name: "Harvest Finance", date: "2020-10-26", amount: 34_000_000, chain: "Ethereum", technique: "Flash loan + USDC/USDT arbitrage" },
+  { name: "Pickle Finance", date: "2020-11-21", amount: 20_000_000, chain: "Ethereum", technique: "Evil jar swap exploit" },
 ];
 
 export function getExploits(filter?: { chain?: string; minAmount?: number; technique?: string }): Exploit[] {
@@ -99,27 +125,47 @@ export async function fetchExploitsLive(): Promise<Exploit[]> {
   if (exploitCache && Date.now() - exploitCache.ts < EXPLOIT_CACHE_TTL) {
     return exploitCache.data;
   }
-  const res = await fetch(`${DEFILLAMA_BASE}/hacks`);
-  if (!res.ok) throw new Error("Failed to fetch exploit data");
-  const raw = (await res.json()) as any[];
-  const data: Exploit[] = raw
-    .map((h) => ({
-      name: (h.name || "Unknown Protocol") as string,
-      date: h.date
-        ? new Date((h.date as number) * 1000).toISOString().split("T")[0]
-        : "Unknown",
-      amount: (h.amount ?? h.funds_lost ?? 0) as number,
-      chain:
-        Array.isArray(h.chains) && h.chains.length > 0
-          ? (h.chains[0] as string)
-          : ((h.chain as string | undefined) ?? "Unknown"),
-      technique: ((h.technique ?? h.category ?? "Unknown") as string),
-    }))
-    .filter((e) => e.amount > 0)
-    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
-    .slice(0, 50);
-  exploitCache = { data, ts: Date.now() };
-  return data;
+  try {
+    const res = await fetch(`${DEFILLAMA_BASE}/hacks`);
+    if (!res.ok) throw new Error("Failed to fetch exploit data");
+
+    const text = await res.text();
+    // Paywall detection: valid response is a JSON array starting with '['
+    if (!text.trimStart().startsWith("[")) {
+      throw new Error("API returned non-array response (possible paywall)");
+    }
+
+    const raw = JSON.parse(text) as any[];
+    if (!Array.isArray(raw) || raw.length === 0) {
+      throw new Error("API returned empty data");
+    }
+
+    const data: Exploit[] = raw
+      .map((h) => ({
+        name: (h.name || "Unknown Protocol") as string,
+        date: h.date
+          ? new Date((h.date as number) * 1000).toISOString().split("T")[0]
+          : "Unknown",
+        amount: (h.amount ?? h.funds_lost ?? 0) as number,
+        chain:
+          Array.isArray(h.chains) && h.chains.length > 0
+            ? (h.chains[0] as string)
+            : ((h.chain as string | undefined) ?? "Unknown"),
+        technique: ((h.technique ?? h.category ?? "Unknown") as string),
+      }))
+      .filter((e) => e.amount > 0)
+      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+      .slice(0, 50);
+    exploitCache = { data, ts: Date.now() };
+    return data;
+  } catch {
+    // Fallback to curated dataset when API is paywalled or unavailable
+    const fallback = [...KNOWN_EXPLOITS].sort(
+      (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
+    );
+    exploitCache = { data: fallback, ts: Date.now() };
+    return fallback;
+  }
 }
 
 // --- Agent chat ---
