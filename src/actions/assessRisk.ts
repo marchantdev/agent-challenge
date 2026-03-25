@@ -8,7 +8,7 @@
  *   2. Fetches live TVL, 24h/7d change, chain list, and category from DefiLlama.
  *   3. Runs a rule-based risk scorer (smart contract, economic, concentration,
  *      volatility, oracle) to produce structured risk flags.
- *   4. Calls {@link generateText} with the Qwen3.5-27B-AWQ-4bit model (running on
+ *   4. Calls `runtime.useModel` with the Qwen3.5-27B-AWQ-4bit model (running on
  *      Nosana GPU) to generate a 3–4 sentence expert commentary that interprets
  *      the raw metrics rather than repeating them.
  *   5. Returns a markdown report with a metrics table, risk flags, and AI analysis.
@@ -19,7 +19,7 @@
  * @module assessRisk
  */
 
-import { generateText, ModelClass } from "@elizaos/core";
+import { ModelType } from "@elizaos/core";
 import type { Action, IAgentRuntime, Memory, State, HandlerCallback, HandlerOptions } from "@elizaos/core";
 import { formatUsd } from "../utils/api.js";
 
@@ -111,11 +111,9 @@ export const assessRiskAction: Action = {
 
     let aiCommentary = "";
     try {
-      aiCommentary = await generateText({
-        runtime,
-        context: `You are Axiom, a DeFi security analyst running on Nosana's decentralised GPU network. Based on these live metrics for ${data.name}, provide a 3-4 sentence expert security commentary. Be specific about the key risks, what to watch for, and any actionable conclusions. Do not repeat the raw numbers — interpret them.\n\nData: ${dataContext}`,
-        modelClass: ModelClass.LARGE,
-      });
+      aiCommentary = await runtime.useModel(ModelType.TEXT_LARGE, {
+        prompt: `You are Axiom, a DeFi security analyst running on Nosana's decentralised GPU network. Based on these live metrics for ${data.name}, provide a 3-4 sentence expert security commentary. Be specific about the key risks, what to watch for, and any actionable conclusions. Do not repeat the raw numbers — interpret them.\n\nData: ${dataContext}`,
+      }) as string;
     } catch { /* LLM unavailable — fallback to structured report */ }
 
     const report = [

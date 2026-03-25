@@ -9,7 +9,7 @@
  *      verification status in parallel via {@link getEthBalance}, {@link isEthContract},
  *      {@link getErc20Name}, {@link getErc20Symbol}, {@link checkSourcifyVerification}.
  *   2. Builds a structured flag list (unverified source, ERC-20 type, EOA detection).
- *   3. Calls {@link generateText} (Qwen3.5-27B via Nosana) for a 3–4 sentence expert
+ *   3. Calls `runtime.useModel` (Qwen3.5-27B via Nosana) for a 3–4 sentence expert
  *      assessment of the address type and security implications.
  *
  * Solana flow:
@@ -17,7 +17,7 @@
  *      transaction signatures via Solana JSON-RPC.
  *   2. Derives account type (wallet, executable program, token account, PDA) using
  *      {@link deriveAccountType}.
- *   3. Calls {@link generateText} (Qwen3.5-27B via Nosana) for a 3–4 sentence
+ *   3. Calls `runtime.useModel` (Qwen3.5-27B via Nosana) for a 3–4 sentence
  *      Solana-specific assessment.
  *
  * Data sources: Sourcify API (ETH verification), Ethplorer/ethRpc utils (ETH balance),
@@ -26,17 +26,13 @@
  * @module inspectContract
  */
 
-import { generateText, ModelClass } from "@elizaos/core";
+import { ModelType } from "@elizaos/core";
 import type { Action, IAgentRuntime, Memory, State, HandlerCallback, HandlerOptions } from "@elizaos/core";
 
 import { getEthBalance, isEthContract, getErc20Name, getErc20Symbol, checkSourcifyVerification } from "../utils/ethRpc.js";
 import { solanaRpc, deriveAccountType } from "../utils/solanaRpc.js";
 
 // ─── Address detection ────────────────────────────────────────────────────────
-
-function isEthAddress(s: string): boolean {
-  return /^0x[a-fA-F0-9]{40}$/.test(s);
-}
 
 function isSolanaAddress(s: string): boolean {
   // base58, 32–44 chars, no 0x prefix
@@ -115,11 +111,9 @@ async function handleEthContract(
 
   let aiAnalysis = "";
   try {
-    aiAnalysis = await generateText({
-      runtime,
-      context: `You are Axiom, a smart contract security analyst. Analyse this Ethereum address data and provide a 3-4 sentence expert assessment. Explain what this address likely is, note any security concerns, and recommend next steps for a security researcher.\n\nData: ${contractContext}\nFlags: ${flags.join("; ")}`,
-      modelClass: ModelClass.LARGE,
-    });
+    aiAnalysis = await runtime.useModel(ModelType.TEXT_LARGE, {
+      prompt: `You are Axiom, a smart contract security analyst. Analyse this Ethereum address data and provide a 3-4 sentence expert assessment. Explain what this address likely is, note any security concerns, and recommend next steps for a security researcher.\n\nData: ${contractContext}\nFlags: ${flags.join("; ")}`,
+    }) as string;
   } catch { /* LLM unavailable — structured report fallback */ }
 
   const report = [
@@ -166,7 +160,6 @@ async function handleSolanaProgram(
   const executable: boolean = info?.executable ?? false;
   const rentEpoch: number | null = info?.rentEpoch ?? null;
   const accountType: string = deriveAccountType(owner, executable);
-  const isProgram = executable;
   const isSystemProgram = owner === "11111111111111111111111111111111";
 
   // Build flags
@@ -184,7 +177,6 @@ async function handleSolanaProgram(
   // Recent tx summary
   const txCount = txs.length;
   // getSignaturesForAddress returns { signature, blockTime, err, ... }
-  const firstTxSig = txs[txs.length - 1]?.signature ?? null;
   const lastTxSig = txs[0]?.signature ?? null;
   const lastTxTime = txs[0]?.blockTime
     ? new Date((txs[0].blockTime as number) * 1000).toISOString().split("T")[0]
@@ -194,11 +186,9 @@ async function handleSolanaProgram(
 
   let aiAnalysis = "";
   try {
-    aiAnalysis = await generateText({
-      runtime,
-      context: `You are Axiom, a Solana security analyst. Analyze this Solana account data and provide a 3-4 sentence expert assessment. Based on the account type, owner program, and executable flag, describe what this account likely is (wallet, program, token account, PDA, etc.), note any security observations, and recommend next steps for a security researcher.\n\nAccount data: ${contractContext}\nFlags: ${flags.join("; ")}`,
-      modelClass: ModelClass.LARGE,
-    });
+    aiAnalysis = await runtime.useModel(ModelType.TEXT_LARGE, {
+      prompt: `You are Axiom, a Solana security analyst. Analyze this Solana account data and provide a 3-4 sentence expert assessment. Based on the account type, owner program, and executable flag, describe what this account likely is (wallet, program, token account, PDA, etc.), note any security observations, and recommend next steps for a security researcher.\n\nAccount data: ${contractContext}\nFlags: ${flags.join("; ")}`,
+    }) as string;
   } catch { /* LLM unavailable */ }
 
   const report = [

@@ -10,6 +10,7 @@ import { createServer, type IncomingMessage, type ServerResponse } from "node:ht
 import { readFile, stat } from "node:fs/promises";
 import { join, extname, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
+import { logger } from "@elizaos/core";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -161,8 +162,8 @@ const server = createServer(async (req, res) => {
 
 export function startFrontendServer(): void {
   server.listen(PORT, () => {
-    console.log(`[Axiom] Frontend server running on port ${PORT}`);
-    console.log(`[Axiom] Proxying API calls to ElizaOS on port ${AGENT_PORT}`);
+    logger.info(`[Axiom] Frontend server running on port ${PORT}`);
+    logger.info(`[Axiom] Proxying API calls to ElizaOS on port ${AGENT_PORT}`);
   });
 }
 

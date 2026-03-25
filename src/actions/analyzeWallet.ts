@@ -32,10 +32,6 @@ interface ProtocolInfo {
 
 // ─── Address detection ────────────────────────────────────────────────────────
 
-function isEthAddress(s: string): boolean {
-  return /^0x[a-fA-F0-9]{40}$/.test(s);
-}
-
 function isSolanaAddress(s: string): boolean {
   return /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(s);
 }
@@ -157,10 +153,7 @@ async function fetchSolanaRecentTxs(address: string): Promise<any[]> {
   } catch { return []; }
 }
 
-function matchSolanaDefiProtocols(tokens: SplToken[], protocols: ProtocolInfo[]): string[] {
-  const solanaProtocols = protocols.filter(p =>
-    p.chains.some(c => c.toLowerCase() === "solana")
-  );
+function matchSolanaDefiProtocols(tokens: SplToken[], _protocols: ProtocolInfo[]): string[] {
   const matched: string[] = [];
   const riskyKeywords = ["leverage", "lp", "vault", "yield", "earn", "farm", "debt", "raydium", "marinade", "jito", "kamino", "drift", "mango"];
   for (const t of tokens) {

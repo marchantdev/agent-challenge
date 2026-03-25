@@ -10,7 +10,7 @@
  *   2. Fetches the DeFiLlama hacks database (cached for 1 hour) and filters
  *      for exploits whose technique matches the detected vulnerability type.
  *   3. Passes the filtered real-world examples plus the detected type to
- *      {@link generateText} (Qwen3.5-27B-AWQ-4bit running on Nosana GPU).
+ *      `runtime.useModel` (Qwen3.5-27B-AWQ-4bit running on Nosana GPU).
  *   4. The LLM generates a comprehensive briefing covering: attack mechanism,
  *      real recent examples, a vulnerable Solidity code snippet, and mitigations.
  *   5. Falls back to a structured list of verified exploits if LLM is unavailable.
@@ -21,7 +21,7 @@
  * @module explainVuln
  */
 
-import { generateText, ModelClass } from "@elizaos/core";
+import { ModelType } from "@elizaos/core";
 import type { Action, IAgentRuntime, Memory, State, HandlerCallback, HandlerOptions } from "@elizaos/core";
 
 interface Exploit {
@@ -136,11 +136,9 @@ Generate a comprehensive security briefing covering:
 Be specific and technical. This is for a DeFi security analyst. Format with markdown headers.`;
 
     try {
-      const explanation = await generateText({
-        runtime,
-        context: prompt,
-        modelClass: ModelClass.LARGE,
-      });
+      const explanation = await runtime.useModel(ModelType.TEXT_LARGE, {
+        prompt,
+      }) as string;
       if (callback) await callback({ text: explanation });
     } catch (err) {
       // Fallback: structured prompt without LLM
