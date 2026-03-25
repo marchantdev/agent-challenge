@@ -16,7 +16,7 @@
 │  │             │    │                                │  │
 │  │  Dashboard  │    │  ┌─────────────────────────┐  │  │
 │  │  Chat       │    │  │   Axiom Security Plugin  │  │  │
-│  │  Scanner    │    │  │   10 Custom Actions       │  │  │
+│  │  Scanner    │    │  │   11 Custom Actions       │  │  │
 │  │  Protocols  │    │  │                           │  │  │
 │  │  Nosana     │    │  │   DefiLlama ←──── TVL     │  │  │
 │  │             │    │  │   Etherscan ←──── Chain    │  │  │
@@ -39,7 +39,7 @@
 - **Protocols** — Searchable/sortable table of top 100 DeFi protocols with risk indicators and anomaly badges
 - **Nosana Status** — Deployment health, inference metrics, network node count, GPU types, "Why Decentralized?" section
 
-### 10 Dynamic Actions (Custom ElizaOS Plugin)
+### 11 Dynamic Actions (Custom ElizaOS Plugin)
 
 | Action | Data Source | Description |
 |--------|-----------|-------------|
@@ -53,6 +53,7 @@
 | `ANALYZE_WALLET` | Etherscan + DefiLlama | ETH wallet risk report — token holdings, DeFi exposure, spending patterns |
 | `NOSANA_STATUS` | Process + Nosana API | Live deployment health, memory usage, network stats, infrastructure awareness |
 | `COMPARE_PROTOCOLS` | DefiLlama API | Side-by-side security comparison of two protocols with scored breakdown and AI analysis |
+| `GENERATE_AUDIT_REPORT` | DefiLlama + Etherscan + Immunefi + rekt.news + AI | **Killer feature** — full audit report orchestrating all data sources into a scored security report with AI risk assessment and recommendations |
 
 ### Nosana Integration
 
