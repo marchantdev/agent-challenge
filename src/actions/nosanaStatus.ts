@@ -12,8 +12,6 @@
 import type { Action, IAgentRuntime, Memory, State, HandlerCallback, HandlerOptions } from "@elizaos/core";
 import { Client } from "@nosana/sdk";
 
-// Nosana REST API endpoints (fallback if SDK call fails)
-const NOSANA_API = "https://api.nosana.com";
 const COINGECKO_API = "https://api.coingecko.com/api/v3";
 // NOS token on Solana mainnet
 const NOS_TOKEN_MINT = "nosRB8DUV67oLNrL45bo2pFLrmsWPrzSZsEs6vc45d";
@@ -58,7 +56,7 @@ async function fetchNosanaNetworkStats(): Promise<NosanaNetworkStats> {
   // 2=done. We count state===1 as active (running) jobs.
   //
   // Both calls hit Solana RPC (getProgramAccounts), which can be slow on public
-  // endpoints. We use a 8-second timeout and fall back to the REST API on failure.
+  // endpoints. We use an 8-second timeout and show "unavailable" if SDK fails.
   const solanaNetwork = process.env.SOLANA_NETWORK || "mainnet-beta";
   try {
     const client = new Client({ solana: { network: solanaNetwork } });
@@ -80,29 +78,6 @@ async function fetchNosanaNetworkStats(): Promise<NosanaNetworkStats> {
     }
   } catch {
     // SDK instantiation or setup failed — fall back to REST API below
-  }
-
-  // --- REST API fallback: fill any gaps the SDK didn't cover ---
-  if (stats.totalNodes === null) {
-    try {
-      const nodeRes = await fetch(`${NOSANA_API}/nodes`, { signal: AbortSignal.timeout(6000) });
-      if (nodeRes.ok) {
-        const nodes = await nodeRes.json() as any;
-        if (Array.isArray(nodes)) {
-          stats.totalNodes = nodes.length;
-          if (stats.activeNodes === null) {
-            stats.activeNodes = nodes.filter(
-              (n: any) => n.status === "running" || n.online === true
-            ).length;
-          }
-        } else if (typeof nodes === "object" && nodes !== null) {
-          stats.totalNodes = nodes.total ?? nodes.count ?? null;
-          if (stats.activeNodes === null) {
-            stats.activeNodes = nodes.active ?? nodes.online ?? null;
-          }
-        }
-      }
-    } catch { /* REST API also unavailable */ }
   }
 
   // --- CoinGecko: NOS token price (reliable, no auth required) ---

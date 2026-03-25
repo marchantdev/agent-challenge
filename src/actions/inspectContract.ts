@@ -7,10 +7,7 @@
 import { generateText, ModelClass } from "@elizaos/core";
 import type { Action, IAgentRuntime, Memory, State, HandlerCallback, HandlerOptions } from "@elizaos/core";
 
-const ETHERSCAN_API = "https://api.etherscan.io/api";
-// Free Etherscan tier works without a key (rate-limited to 5 req/sec)
-const ETH_API_KEY = process.env.ETHERSCAN_API_KEY || "";
-
+import { getEthBalance, isEthContract, getErc20Name, getErc20Symbol, checkSourcifyVerification } from "../utils/ethRpc.js";
 import { solanaRpc, deriveAccountType } from "../utils/solanaRpc.js";
 
 // ─── Address detection ────────────────────────────────────────────────────────
@@ -63,43 +60,45 @@ async function handleEthContract(
   address: string,
   callback?: HandlerCallback
 ): Promise<void> {
-  const [balRes, txRes, srcRes] = await Promise.all([
-    fetch(`${ETHERSCAN_API}?module=account&action=balance&address=${address}&tag=latest&apikey=${ETH_API_KEY}`),
-    fetch(`${ETHERSCAN_API}?module=account&action=txlist&address=${address}&startblock=0&endblock=99999999&page=1&offset=5&sort=asc&apikey=${ETH_API_KEY}`),
-    fetch(`${ETHERSCAN_API}?module=contract&action=getsourcecode&address=${address}&apikey=${ETH_API_KEY}`),
+  // Fetch balance, code presence, ERC-20 metadata, and Sourcify verification in parallel
+  const [ethBalance, contractCode, erc20Name, erc20Symbol, verificationStatus] = await Promise.allSettled([
+    getEthBalance(address),
+    isEthContract(address),
+    getErc20Name(address),
+    getErc20Symbol(address),
+    checkSourcifyVerification(address),
   ]);
 
-  const balData = await balRes.json() as any;
-  const txData = await txRes.json() as any;
-  const srcData = await srcRes.json() as any;
+  const balance = ethBalance.status === "fulfilled" ? ethBalance.value : 0;
+  const isContract = contractCode.status === "fulfilled" ? contractCode.value : false;
+  const tokenName = erc20Name.status === "fulfilled" ? erc20Name.value : null;
+  const tokenSymbol = erc20Symbol.status === "fulfilled" ? erc20Symbol.value : null;
+  const verif = verificationStatus.status === "fulfilled" ? verificationStatus.value : "unverified";
 
-  const weiBalance = balData.result || "0";
-  const ethBalance = (parseInt(weiBalance) / 1e18).toFixed(4);
-  const verified = srcData.result?.[0]?.SourceCode ? true : false;
-  const contractName = srcData.result?.[0]?.ContractName || "Unknown";
-  const compiler = srcData.result?.[0]?.CompilerVersion || "Unknown";
-  const isProxy = srcData.result?.[0]?.Proxy === "1";
-  const implementation = srcData.result?.[0]?.Implementation || "";
-
-  const firstTx = Array.isArray(txData.result) && txData.result.length > 0 ? txData.result[0] : null;
-  const deployer = firstTx?.from || "Unknown";
-  const deployDate = firstTx ? new Date(parseInt(firstTx.timeStamp) * 1000).toISOString().split("T")[0] : "Unknown";
+  const contractName = tokenName || (isContract ? "Unknown Contract" : "EOA (Wallet)");
+  const verified = verif !== "unverified";
+  const ethBalance_str = balance.toFixed(4);
 
   const flags: string[] = [];
-  if (!verified) flags.push("**CRITICAL:** Source code NOT verified on Etherscan");
-  if (isProxy) flags.push("**WARNING:** Proxy contract — admin can upgrade implementation");
-  if (verified && !isProxy) flags.push("**OK:** Verified, non-upgradeable contract");
+  if (!isContract) {
+    flags.push("**INFO:** This is an externally owned account (EOA), not a smart contract");
+  } else {
+    if (!verified) flags.push("**WARNING:** Source code NOT verified on Sourcify");
+    if (verif === "partial") flags.push("**INFO:** Partially verified on Sourcify (metadata may differ)");
+    if (verified && verif === "verified") flags.push("**OK:** Fully verified on Sourcify");
+    if (tokenName && tokenSymbol) flags.push(`**INFO:** ERC-20 token — ${tokenName} (${tokenSymbol})`);
+  }
 
-  const contractContext = `Contract: ${contractName} | Address: ${address} | Balance: ${ethBalance} ETH | Verified: ${verified} | Proxy: ${isProxy}${isProxy && implementation ? ` | Implementation: ${implementation}` : ""} | Compiler: ${compiler} | Deployer: ${deployer} | Deployed: ${deployDate}`;
+  const contractContext = `Contract: ${contractName} | Address: ${address} | Balance: ${ethBalance_str} ETH | Is Contract: ${isContract} | Verified: ${verified} | ERC-20: ${tokenName ? `${tokenName} (${tokenSymbol})` : "No"}`;
 
   let aiAnalysis = "";
   try {
     aiAnalysis = await generateText({
       runtime,
-      context: `You are Axiom, a smart contract security analyst. Analyse this Ethereum contract data and provide a 3-4 sentence expert assessment. Explain likely what this contract does based on its name, note any security concerns from the flags (unverified, proxy upgradeable, etc.), and recommend next steps for a security researcher.\n\nContract data: ${contractContext}\nRisk flags: ${flags.join("; ")}`,
+      context: `You are Axiom, a smart contract security analyst. Analyse this Ethereum address data and provide a 3-4 sentence expert assessment. Explain what this address likely is, note any security concerns, and recommend next steps for a security researcher.\n\nData: ${contractContext}\nFlags: ${flags.join("; ")}`,
       modelClass: ModelClass.LARGE,
     });
-  } catch { /* LLM unavailable — fallback to structured report */ }
+  } catch { /* LLM unavailable — structured report fallback */ }
 
   const report = [
     `## Contract Inspection: ${contractName}`,
@@ -108,20 +107,16 @@ async function handleEthContract(
     `|----------|-------|`,
     `| Chain | Ethereum |`,
     `| Address | \`${address}\` |`,
-    `| Name | ${contractName} |`,
-    `| Balance | ${ethBalance} ETH |`,
-    `| Verified | ${verified ? "Yes" : "No"} |`,
-    `| Proxy | ${isProxy ? "Yes" : "No"} |`,
-    isProxy && implementation ? `| Implementation | \`${implementation}\` |` : "",
-    `| Compiler | ${compiler} |`,
-    `| Deployer | \`${deployer}\` |`,
-    `| Deploy Date | ${deployDate} |`,
+    `| Type | ${isContract ? "Smart Contract" : "EOA (Wallet)"} |`,
+    tokenSymbol ? `| Token | ${tokenName} (${tokenSymbol}) |` : "",
+    `| ETH Balance | ${ethBalance_str} ETH |`,
+    `| Verified | ${verif === "verified" ? "Yes (Sourcify)" : verif === "partial" ? "Partial (Sourcify)" : "No"} |`,
     ``,
     `### Risk Flags`,
     flags.map((f, i) => `${i + 1}. ${f}`).join("\n"),
     aiAnalysis ? `\n### AI Analysis (Qwen via Nosana)\n${aiAnalysis}` : "",
     ``,
-    `> Use ASSESS_PROTOCOL_RISK to evaluate the protocol this contract belongs to.`,
+    `> [View on Etherscan](https://etherscan.io/address/${address}) | Use ANALYZE_WALLET for token holdings.`,
   ].filter(Boolean).join("\n");
 
   if (callback) await callback({ text: report });

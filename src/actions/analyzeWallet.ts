@@ -8,10 +8,9 @@
 import type { Action, IAgentRuntime, Memory, State, HandlerCallback, HandlerOptions } from "@elizaos/core";
 
 import { solanaRpc, WELL_KNOWN_TOKENS } from "../utils/solanaRpc.js";
+import { fetchEthplorerInfo } from "../utils/ethRpc.js";
 
-const ETHERSCAN_API = "https://api.etherscan.io/api";
 const DEFILLAMA_API = "https://api.llama.fi";
-const ETH_API_KEY = process.env.ETHERSCAN_API_KEY || "";
 
 // ─── Shared types ─────────────────────────────────────────────────────────────
 
@@ -78,44 +77,25 @@ async function fetchTopProtocols(): Promise<ProtocolInfo[]> {
   } catch { return []; }
 }
 
-// ─── Ethereum wallet functions ────────────────────────────────────────────────
+// ─── Ethereum wallet functions (Ethplorer — no API key required) ─────────────
 
-async function fetchEthBalance(address: string): Promise<number | null> {
+async function fetchEthWalletData(address: string): Promise<{
+  ethBalance: number | null;
+  tokens: TokenBalance[];
+}> {
   try {
-    const res = await fetch(
-      `${ETHERSCAN_API}?module=account&action=balance&address=${address}&tag=latest&apikey=${ETH_API_KEY}`,
-      { signal: AbortSignal.timeout(8000) }
-    );
-    if (!res.ok) return null;
-    const data = await res.json() as any;
-    if (data.status !== "1") return null;
-    return parseFloat(data.result) / 1e18;
-  } catch { return null; }
-}
-
-async function fetchErc20Balances(address: string): Promise<TokenBalance[]> {
-  try {
-    const res = await fetch(
-      `${ETHERSCAN_API}?module=account&action=tokentx&address=${address}&startblock=0&endblock=99999999&page=1&offset=20&sort=desc&apikey=${ETH_API_KEY}`,
-      { signal: AbortSignal.timeout(8000) }
-    );
-    if (!res.ok) return [];
-    const data = await res.json() as any;
-    if (data.status !== "1" || !Array.isArray(data.result)) return [];
-
-    const seen = new Map<string, TokenBalance>();
-    for (const tx of data.result) {
-      if (seen.has(tx.contractAddress)) continue;
-      seen.set(tx.contractAddress, {
-        symbol: tx.tokenSymbol,
-        name: tx.tokenName,
-        balance: 0,
-        valueUsd: null,
-        contractAddress: tx.contractAddress,
-      });
-    }
-    return Array.from(seen.values()).slice(0, 10);
-  } catch { return []; }
+    const info = await fetchEthplorerInfo(address);
+    const tokens: TokenBalance[] = info.tokens.map(t => ({
+      symbol: t.symbol,
+      name: t.name,
+      balance: t.balance,
+      valueUsd: t.priceUsd !== null ? t.balance * t.priceUsd : null,
+      contractAddress: t.contractAddress,
+    }));
+    return { ethBalance: info.ethBalance, tokens };
+  } catch {
+    return { ethBalance: null, tokens: [] };
+  }
 }
 
 // ─── Solana wallet functions (Solana JSON-RPC — no API key required) ──────────
@@ -335,14 +315,14 @@ export const analyzeWalletAction: Action = {
     if (ethAddr) {
       const shortAddr = `${ethAddr.slice(0, 6)}...${ethAddr.slice(-4)}`;
       if (callback) await callback({
-        text: `Analyzing Ethereum wallet \`${shortAddr}\`...\n\nFetching on-chain data from Etherscan.`
+        text: `Analyzing Ethereum wallet \`${shortAddr}\`...\n\nFetching on-chain data from Ethplorer + DefiLlama.`
       });
 
-      const [ethBalance, tokens, protocols] = await Promise.all([
-        fetchEthBalance(ethAddr),
-        fetchErc20Balances(ethAddr),
+      const [walletData, protocols] = await Promise.all([
+        fetchEthWalletData(ethAddr),
         fetchTopProtocols(),
       ]);
+      const { ethBalance, tokens } = walletData;
 
       const risk = calculateEthRiskProfile(ethBalance, tokens, protocols);
       const riskEmoji = risk.level === "HIGH" ? "🔴" : risk.level === "MEDIUM" ? "🟡" : "🟢";
@@ -364,11 +344,13 @@ export const analyzeWalletAction: Action = {
       }
 
       if (tokens.length > 0) {
-        sections.push("### Recent Token Activity");
-        sections.push("| Token | Symbol | Contract |");
-        sections.push("|-------|--------|---------|");
+        sections.push("### ERC-20 Token Holdings");
+        sections.push("| Token | Symbol | Balance | Est. Value |");
+        sections.push("|-------|--------|---------|------------|");
         for (const t of tokens.slice(0, 8)) {
-          sections.push(`| ${t.name.slice(0, 25)} | ${t.symbol} | \`${t.contractAddress.slice(0, 10)}...\` |`);
+          const val = t.valueUsd !== null ? formatUsd(t.valueUsd) : "—";
+          const bal = t.balance.toLocaleString(undefined, { maximumFractionDigits: 4 });
+          sections.push(`| ${t.name.slice(0, 22)} | ${t.symbol} | ${bal} | ${val} |`);
         }
         sections.push("");
       }
@@ -392,7 +374,7 @@ export const analyzeWalletAction: Action = {
         sections.push("- 💡 Enable 2FA on all associated exchanges");
       }
       sections.push("");
-      sections.push(`_Data from Etherscan + DefiLlama. [View on Etherscan](https://etherscan.io/address/${ethAddr})_`);
+      sections.push(`_Data from Ethplorer + DefiLlama. [View on Etherscan](https://etherscan.io/address/${ethAddr})_`);
 
       if (callback) await callback({ text: sections.join("\n") });
       return;

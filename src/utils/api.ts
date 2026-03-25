@@ -4,8 +4,6 @@
  */
 
 const DEFILLAMA_API = "https://api.llama.fi";
-const ETHERSCAN_API = "https://api.etherscan.io/api";
-const ETHERSCAN_KEY = process.env.ETHERSCAN_API_KEY || "YourApiKeyToken";
 
 // Simple in-memory cache with TTL
 const cache = new Map<string, { data: any; expires: number }>();
@@ -23,30 +21,6 @@ export async function cachedFetch(url: string, ttlMs = 300_000): Promise<any> {
 
 export async function fetchDefiLlamaProtocols(): Promise<any[]> {
   return cachedFetch(`${DEFILLAMA_API}/protocols`);
-}
-
-export async function fetchEtherscanBalance(address: string): Promise<string> {
-  const data = await cachedFetch(
-    `${ETHERSCAN_API}?module=account&action=balance&address=${address}&tag=latest&apikey=${ETHERSCAN_KEY}`,
-    60_000
-  );
-  return data.result || "0";
-}
-
-export async function fetchEtherscanSource(address: string): Promise<any> {
-  const data = await cachedFetch(
-    `${ETHERSCAN_API}?module=contract&action=getsourcecode&address=${address}&apikey=${ETHERSCAN_KEY}`,
-    60_000
-  );
-  return data.result?.[0] || {};
-}
-
-export async function fetchEtherscanTxList(address: string, count = 5): Promise<any[]> {
-  const data = await cachedFetch(
-    `${ETHERSCAN_API}?module=account&action=txlist&address=${address}&startblock=0&endblock=99999999&page=1&offset=${count}&sort=asc&apikey=${ETHERSCAN_KEY}`,
-    60_000
-  );
-  return Array.isArray(data.result) ? data.result : [];
 }
 
 export function formatUsd(n: number): string {
