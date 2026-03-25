@@ -2,6 +2,31 @@
 
 > Security infrastructure that's as decentralized as the protocols it protects. Powered by Nosana + ElizaOS.
 
+![Nosana x ElizaOS](NosanaXEliza.jpg)
+
+---
+
+## Demo
+
+> **Demo Video:** [Watch on YouTube / Loom](https://your-demo-link-here) <!-- TODO: replace with actual link -->
+
+### Screenshots
+
+**Dashboard** — Live TVL stats, exploit timeline, anomaly alerts
+![Dashboard](screenshot-dashboard.png)
+
+**Chat** — Conversation with Axiom, markdown risk reports, suggestion chips
+![Chat](screenshot-chat.png)
+
+**Scanner** — Paste any ETH/Solana address for instant on-chain inspection
+![Scanner](screenshot-scanner.png)
+
+**Protocols** — Searchable/sortable table of top 100 DeFi protocols
+![Protocols](screenshot-protocols.png)
+
+**Nosana Status** — Deployment health, NOS price, GPU metrics
+![Nosana Status](screenshot-nosana.png)
+
 ---
 
 ## Architecture
@@ -16,12 +41,13 @@
 │  │             │    │                                │  │
 │  │  Dashboard  │    │  ┌─────────────────────────┐  │  │
 │  │  Chat       │    │  │   Axiom Security Plugin  │  │  │
-│  │  Scanner    │    │  │   9 Custom Actions        │  │  │
+│  │  Scanner    │    │  │   10 Dynamic Actions      │  │  │
 │  │  Protocols  │    │  │                           │  │  │
 │  │  Nosana     │    │  │   DefiLlama ←──── TVL     │  │  │
-│  │             │    │  │   Etherscan ←──── Chain    │  │  │
+│  │             │    │  │   Etherscan V2 ←── Chain   │  │  │
+│  │             │    │  │   Solana RPC ←── Solana    │  │  │
 │  │             │    │  │   GitHub    ←──── Repos    │  │  │
-│  │             │    │  │   Immunefi  ←──── Bounties │  │  │
+│  │             │    │  │   CoinGecko ←── NOS price  │  │  │
 │  └─────────────┘    │  └─────────────────────────┘  │  │
 │                     │                                │  │
 │                     │  Model: Qwen3.5-27B-AWQ-4bit   │  │
@@ -29,37 +55,61 @@
 └───────────────────────────────────────────────────────┘
 ```
 
+---
+
 ## Features
 
 ### Custom React Dashboard (5 Views)
 
 - **Dashboard** — Live stat cards, TVL bar chart, exploit timeline, attack vector distribution, TVL anomaly alerts
 - **Chat** — Conversation with Axiom agent, markdown rendering, structured risk reports, suggestion chips
-- **Scanner** — Paste any Ethereum address for instant analysis (verification, proxy detection, compiler version)
+- **Scanner** — Paste any Ethereum or Solana address for instant analysis (verification, proxy detection, compiler version)
 - **Protocols** — Searchable/sortable table of top 100 DeFi protocols with risk indicators and anomaly badges
-- **Nosana Status** — Deployment health, inference metrics, network node count, GPU types, "Why Decentralized?" section
+- **Nosana Status** — Deployment health, inference metrics, NOS token price, network node count, "Why Decentralized?" section
 
-### 9 Dynamic Actions (Custom ElizaOS Plugin)
+### 10 Dynamic Actions (Custom ElizaOS Plugin)
 
 | Action | Data Source | Description |
-|--------|-----------|-------------|
-| `ASSESS_PROTOCOL_RISK` | DefiLlama API | Real-time 5-category risk assessment with live TVL, volatility, and chain data |
-| `EXPLAIN_VULNERABILITY` | Curated DB + examples | Reentrancy, flash loans, oracle manipulation, bridge exploits, access control |
-| `SCAN_DEFI_TVL` | DefiLlama API | Live TVL rankings with category/chain filters and anomaly detection |
-| `INSPECT_CONTRACT` | Etherscan API | Balance, verification, proxy detection, compiler version, deployer info |
+|--------|-------------|-------------|
+| `ASSESS_PROTOCOL_RISK` | DefiLlama API + Qwen LLM | Real-time 5-category risk assessment with live TVL, volatility, and AI-generated expert commentary |
+| `EXPLAIN_VULNERABILITY` | DeFiLlama Hacks API + Qwen LLM | Explains reentrancy, flash loans, oracle manipulation, bridge exploits — with real verified examples and Solidity code patterns |
+| `SCAN_DEFI_TVL` | DefiLlama API | Live TVL rankings across all chains/categories with anomaly detection and 24h/7d change |
+| `INSPECT_CONTRACT` | Etherscan V2 + Solana RPC + Sourcify + Qwen LLM | Inspects Ethereum contracts (balance, verification, ERC-20 metadata) and Solana accounts (type, owner program, recent txs) |
 | `EXPLOIT_HISTORY` | DeFiLlama Hacks API (478+ records) | Live exploit database — 1h cache, filters by chain/category/technique/year |
-| `SCAN_BOUNTIES` | Immunefi API | Live bug bounty program scanner with reward tiers |
-| `AUDIT_RECON` | GitHub API | Recent commits, audit indicators, repo health for any GitHub repository |
-| `ANALYZE_WALLET` | Etherscan + DefiLlama | ETH wallet risk report — token holdings, DeFi exposure, spending patterns |
-| `NOSANA_STATUS` | Process + Nosana API | Live deployment health, memory usage, network stats, infrastructure awareness |
+| `SCAN_BOUNTIES` | Immunefi Sitemap API | Live bug bounty program scanner sorted by most recent activity |
+| `AUDIT_RECON` | GitHub API | Recent commits, audit-file indicators, repo stars and language for any GitHub repository |
+| `ANALYZE_WALLET` | Ethplorer (ETH) + Solana RPC + DefiLlama | ETH and Solana wallet risk report — native balance, token holdings, DeFi exposure, risk score |
+| `MONITOR_PROTOCOL` | DefiLlama API | Add protocols to a TVL watchlist; alerts when TVL drops >10% since monitoring started |
+| `NOSANA_STATUS` | Nosana SDK (Solana on-chain) + CoinGecko | Live deployment health, memory usage, NOS token price, network node/job counts via Nosana SDK |
+
+### Cross-Chain Support
+
+Axiom operates across **Ethereum** and **Solana** natively:
+
+- **Ethereum** — Contract inspection via Sourcify/Etherscan V2, ERC-20 metadata, ETH wallet analysis via Ethplorer
+- **Solana** — Account inspection via Solana JSON-RPC (`getAccountInfo`, `getSignaturesForAddress`), SPL token holdings via `getTokenAccountsByOwner`, SOL balance
+- **Multi-chain TVL** — DefiLlama data covers Ethereum, Solana, Arbitrum, Base, Polygon, Avalanche, BSC and 50+ chains
+
+### Data Sources
+
+| Source | Used By |
+|--------|---------|
+| **DefiLlama API** (`api.llama.fi`) | TVL rankings, protocol metadata, exploit history, protocol watchlist |
+| **Etherscan V2 / Ethplorer** | ETH wallet balances, ERC-20 token data |
+| **Sourcify** | Smart contract source verification status |
+| **Solana JSON-RPC** | SOL balances, SPL tokens, Solana account inspection |
+| **GitHub API** | Repo commits, audit file detection, security posture |
+| **CoinGecko API** | NOS token price and market cap |
+| **Nosana SDK** | On-chain node counts, active job counts from Solana programs |
+| **Immunefi Sitemap** | Live bug bounty program listings |
 
 ### Nosana Integration
 
 - **Deployed on Nosana GPU nodes** (NVIDIA RTX 3090)
+- **Nosana SDK** — Uses `@nosana/sdk` `Client` to query node and job counts directly from Solana on-chain data
 - **Health endpoints** — `/api/health` and `/api/metrics` serving real operational data
-- **Network awareness** — Agent knows about Nosana node count, GPU types, and its own deployment status
+- **Network awareness** — Agent reports NOS token price (CoinGecko), node count, and active jobs
 - **CI/CD pipeline** — GitHub Actions builds Docker image on every push to `main`
-- **Network-aware character** — Agent explains why decentralized compute matters for security tooling
 
 ### Health & Metrics Endpoints
 
@@ -134,14 +184,14 @@ nosana job post \
 │       ├── lib/            # API client, types
 │       └── styles/         # Tailwind globals
 ├── src/                    # ElizaOS agent plugin
-│   ├── actions/            # 9 custom actions (each in own file)
+│   ├── actions/            # 10 custom actions (each in own file)
 │   ├── types/              # Shared TypeScript interfaces
-│   ├── utils/              # API helpers, formatting
+│   ├── utils/              # Shared API helpers (formatUsd, cachedFetch, ethRpc, solanaRpc)
 │   ├── character.ts        # Axiom character definition
 │   ├── plugin.ts           # Plugin registration
 │   ├── server.ts           # Frontend server + proxy + health endpoints
 │   └── index.ts            # Project entry point
-├── characters/             # Character JSON
+├── characters/             # Character JSON (agent.character.json)
 ├── nos_job_def/            # Nosana job definition
 ├── .github/workflows/      # CI/CD pipeline
 ├── Dockerfile              # Multi-stage build (frontend + agent)
@@ -176,10 +226,11 @@ Axiom runs on Nosana's decentralized GPU network — a Solana-based compute mark
 | Layer | Technology |
 |-------|-----------|
 | Agent Framework | ElizaOS v1 |
-| LLM | Qwen3.5-27B-AWQ-4bit |
+| LLM | Qwen3.5-27B-AWQ-4bit (via Nosana GPU) |
 | Frontend | React 19 + Vite 6 + TypeScript + Tailwind CSS |
 | Compute | Nosana decentralized GPU (RTX 3090) |
-| APIs | DefiLlama, DeFiLlama Hacks, Etherscan, GitHub, Immunefi, Nosana |
+| Nosana SDK | `@nosana/sdk` for on-chain node/job queries |
+| APIs | DefiLlama, DeFiLlama Hacks, Etherscan V2, Sourcify, Solana RPC, CoinGecko, GitHub, Immunefi |
 | Container | Docker (multi-stage build) |
 | CI/CD | GitHub Actions |
 

@@ -1,7 +1,29 @@
 /**
  * INSPECT_CONTRACT
- * Fetches on-chain data for a contract/program address.
- * Supports both Ethereum (Etherscan) and Solana (Solscan) addresses.
+ *
+ * AI-powered on-chain contract and program inspector.
+ * Supports both Ethereum (0x…) and Solana (base58) addresses — auto-detected.
+ *
+ * Ethereum flow:
+ *   1. Fetches ETH balance, bytecode presence, ERC-20 name/symbol, and Sourcify
+ *      verification status in parallel via {@link getEthBalance}, {@link isEthContract},
+ *      {@link getErc20Name}, {@link getErc20Symbol}, {@link checkSourcifyVerification}.
+ *   2. Builds a structured flag list (unverified source, ERC-20 type, EOA detection).
+ *   3. Calls {@link generateText} (Qwen3.5-27B via Nosana) for a 3–4 sentence expert
+ *      assessment of the address type and security implications.
+ *
+ * Solana flow:
+ *   1. Fetches account info (lamports, owner program, executable flag) and recent
+ *      transaction signatures via Solana JSON-RPC.
+ *   2. Derives account type (wallet, executable program, token account, PDA) using
+ *      {@link deriveAccountType}.
+ *   3. Calls {@link generateText} (Qwen3.5-27B via Nosana) for a 3–4 sentence
+ *      Solana-specific assessment.
+ *
+ * Data sources: Sourcify API (ETH verification), Ethplorer/ethRpc utils (ETH balance),
+ * Solana JSON-RPC (account data), Nosana-hosted Qwen LLM (AI commentary).
+ *
+ * @module inspectContract
  */
 
 import { generateText, ModelClass } from "@elizaos/core";

@@ -4,15 +4,9 @@
  */
 
 import type { Action, IAgentRuntime, Memory, State, HandlerCallback, HandlerOptions } from "@elizaos/core";
+import { formatUsd } from "../utils/api.js";
 
 const DEFILLAMA_API = "https://api.llama.fi";
-
-function formatUsd(n: number): string {
-  if (n >= 1e9) return `$${(n / 1e9).toFixed(2)}B`;
-  if (n >= 1e6) return `$${(n / 1e6).toFixed(1)}M`;
-  if (n >= 1e3) return `$${(n / 1e3).toFixed(0)}K`;
-  return `$${n.toFixed(0)}`;
-}
 
 export const scanTvlAction: Action = {
   name: "SCAN_DEFI_TVL",

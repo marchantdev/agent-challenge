@@ -11,6 +11,7 @@
 
 import type { Action, IAgentRuntime, Memory, State, HandlerCallback, HandlerOptions } from "@elizaos/core";
 import { Client } from "@nosana/sdk";
+import { formatUsd } from "../utils/api.js";
 
 const COINGECKO_API = "https://api.coingecko.com/api/v3";
 // NOS token on Solana mainnet
@@ -98,12 +99,6 @@ async function fetchNosanaNetworkStats(): Promise<NosanaNetworkStats> {
   return stats;
 }
 
-function formatUsd(n: number): string {
-  if (n >= 1e9) return `$${(n / 1e9).toFixed(2)}B`;
-  if (n >= 1e6) return `$${(n / 1e6).toFixed(1)}M`;
-  if (n >= 1e3) return `$${(n / 1e3).toFixed(0)}K`;
-  return `$${n.toFixed(2)}`;
-}
 
 export const nosanaStatusAction: Action = {
   name: "NOSANA_STATUS",

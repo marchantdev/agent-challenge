@@ -1,11 +1,27 @@
 /**
  * ASSESS_PROTOCOL_RISK
- * Fetches live TVL data from DefiLlama, then uses the Nosana-hosted Qwen
- * LLM (via ElizaOS generateText) to produce expert security commentary.
+ *
+ * AI-powered DeFi protocol risk assessment.
+ *
+ * Flow:
+ *   1. Parses the protocol name from the user's message.
+ *   2. Fetches live TVL, 24h/7d change, chain list, and category from DefiLlama.
+ *   3. Runs a rule-based risk scorer (smart contract, economic, concentration,
+ *      volatility, oracle) to produce structured risk flags.
+ *   4. Calls {@link generateText} with the Qwen3.5-27B-AWQ-4bit model (running on
+ *      Nosana GPU) to generate a 3–4 sentence expert commentary that interprets
+ *      the raw metrics rather than repeating them.
+ *   5. Returns a markdown report with a metrics table, risk flags, and AI analysis.
+ *
+ * Data sources: DefiLlama `/protocols` endpoint, Nosana-hosted Qwen LLM.
+ * Falls back to structured report only if LLM is unavailable.
+ *
+ * @module assessRisk
  */
 
 import { generateText, ModelClass } from "@elizaos/core";
 import type { Action, IAgentRuntime, Memory, State, HandlerCallback, HandlerOptions } from "@elizaos/core";
+import { formatUsd } from "../utils/api.js";
 
 const DEFILLAMA_API = "https://api.llama.fi";
 
@@ -89,7 +105,6 @@ export const assessRiskAction: Action = {
     const category = data.category || "Unknown";
     const risks = assessRiskLevel(tvl, change1d, data.audits || 0, chains);
 
-    const formatUsd = (n: number) => n >= 1e9 ? `$${(n/1e9).toFixed(2)}B` : n >= 1e6 ? `$${(n/1e6).toFixed(1)}M` : `$${(n/1e3).toFixed(0)}K`;
 
     // Generate AI-powered expert commentary via Nosana-hosted Qwen model
     const dataContext = `Protocol: ${data.name} | Category: ${category} | TVL: ${formatUsd(tvl)} | Chains: ${(data.chains || []).join(", ")} | 24h: ${change1d !== null ? change1d.toFixed(2) + "%" : "N/A"} | 7d: ${change7d !== null ? change7d.toFixed(2) + "%" : "N/A"} | Flags: ${risks.join("; ")}`;

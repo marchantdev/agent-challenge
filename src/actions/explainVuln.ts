@@ -1,7 +1,24 @@
 /**
  * EXPLAIN_VULNERABILITY
- * Uses generateText() (Qwen via Nosana) to generate contextual DeFi vulnerability
- * explanations with real recent examples from DeFiLlama hacks data.
+ *
+ * AI-powered DeFi vulnerability explainer with real verified exploit examples.
+ *
+ * Flow:
+ *   1. Detects the vulnerability type from the user's message using the
+ *      {@link VULN_KEYWORDS} map (reentrancy, flash loan, oracle, bridge,
+ *      access control, integer overflow, front running / MEV).
+ *   2. Fetches the DeFiLlama hacks database (cached for 1 hour) and filters
+ *      for exploits whose technique matches the detected vulnerability type.
+ *   3. Passes the filtered real-world examples plus the detected type to
+ *      {@link generateText} (Qwen3.5-27B-AWQ-4bit running on Nosana GPU).
+ *   4. The LLM generates a comprehensive briefing covering: attack mechanism,
+ *      real recent examples, a vulnerable Solidity code snippet, and mitigations.
+ *   5. Falls back to a structured list of verified exploits if LLM is unavailable.
+ *
+ * Data sources: DeFiLlama Hacks API (`api.llama.fi/hacks`, 1h cache),
+ * Nosana-hosted Qwen LLM for explanation generation.
+ *
+ * @module explainVuln
  */
 
 import { generateText, ModelClass } from "@elizaos/core";

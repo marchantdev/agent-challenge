@@ -8,6 +8,7 @@
  */
 
 import type { Action, IAgentRuntime, Memory, State, HandlerCallback, HandlerOptions } from "@elizaos/core";
+import { formatUsd } from "../utils/api.js";
 
 const DEFILLAMA_API = "https://api.llama.fi";
 
@@ -49,11 +50,6 @@ async function fetchCurrentTvl(slug: string): Promise<number | null> {
   }
 }
 
-function formatUsd(n: number): string {
-  if (n >= 1e9) return `$${(n / 1e9).toFixed(2)}B`;
-  if (n >= 1e6) return `$${(n / 1e6).toFixed(1)}M`;
-  return `$${(n / 1e3).toFixed(0)}K`;
-}
 
 function isAddIntent(text: string): boolean {
   return /\b(monitor|watch|track|add|alert)\b/i.test(text) &&
