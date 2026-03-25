@@ -11,7 +11,7 @@ const SUGGESTIONS = [
   "Nosana network status",
 ];
 
-function renderInline(text: string): React.ReactElement {
+function renderInline(text: string): React.ReactNode {
   const parts = text.split(/(\*\*[^*]+\*\*|`[^`]+`)/g);
   return (
     <>
@@ -29,7 +29,7 @@ function renderInline(text: string): React.ReactElement {
 }
 
 function formatMessageContent(text: string) {
-  const parts: React.ReactElement[] = [];
+  const parts: React.ReactNode[] = [];
   const lines = text.split("\n");
   let inCodeBlock = false;
   let codeLines: string[] = [];
