@@ -3,20 +3,22 @@
  * Fetches on-chain data for an Ethereum contract: balance, verification, proxy detection, deployer analysis.
  */
 
+import { generateText, ModelClass } from "@elizaos/core";
 import type { Action, IAgentRuntime, Memory, State, HandlerCallback, HandlerOptions } from "@elizaos/core";
 
 const ETHERSCAN_API = "https://api.etherscan.io/api";
-const API_KEY = process.env.ETHERSCAN_API_KEY || "YourApiKeyToken";
+// Free Etherscan tier works without a key (rate-limited to 5 req/sec)
+const API_KEY = process.env.ETHERSCAN_API_KEY || "";
 
 export const inspectContractAction: Action = {
   name: "INSPECT_CONTRACT",
   description: "Inspects an Ethereum contract address: balance, transaction count, source verification, proxy detection.",
   similes: ["INSPECT", "CONTRACT_INFO", "ANALYZE_CONTRACT", "CHECK_CONTRACT", "SCAN_CONTRACT"],
   validate: async (_runtime: IAgentRuntime, message: Memory) => {
-    const text = (message.content?.text || "").toLowerCase();
+      const text = (message.content?.text || "").toLowerCase();
     return text.includes("0x") || text.includes("inspect") || text.includes("contract") || text.includes("scan");
   },
-  handler: async (_runtime: IAgentRuntime, message: Memory, _state?: State, _options?: HandlerOptions, callback?: HandlerCallback) => {
+  handler: async (runtime: IAgentRuntime, message: Memory, _state?: State, _options?: HandlerOptions, callback?: HandlerCallback) => {
     const text = message.content?.text || "";
     const addrMatch = text.match(/0x[a-fA-F0-9]{40}/);
     if (!addrMatch) {
@@ -58,6 +60,18 @@ export const inspectContractAction: Action = {
       if (isProxy) flags.push("**WARNING:** Proxy contract — admin can upgrade implementation");
       if (verified && !isProxy) flags.push("**OK:** Verified, non-upgradeable contract");
 
+      // AI-powered contract analysis via Nosana-hosted Qwen model
+      const contractContext = `Contract: ${contractName} | Address: ${address} | Balance: ${ethBalance} ETH | Verified: ${verified} | Proxy: ${isProxy}${isProxy && implementation ? ` | Implementation: ${implementation}` : ""} | Compiler: ${compiler} | Deployer: ${deployer} | Deployed: ${deployDate}`;
+
+      let aiAnalysis = "";
+      try {
+        aiAnalysis = await generateText({
+          runtime,
+          context: `You are Axiom, a smart contract security analyst. Analyse this Ethereum contract data and provide a 3-4 sentence expert assessment. Explain likely what this contract does based on its name, note any security concerns from the flags (unverified, proxy upgradeable, etc.), and recommend next steps for a security researcher.\n\nContract data: ${contractContext}\nRisk flags: ${flags.join("; ")}`,
+          modelClass: ModelClass.LARGE,
+        });
+      } catch { /* LLM unavailable — fallback to structured report */ }
+
       const report = [
         `## Contract Inspection: ${contractName}`,
         ``,
@@ -75,6 +89,7 @@ export const inspectContractAction: Action = {
         ``,
         `### Risk Flags`,
         flags.map((f, i) => `${i + 1}. ${f}`).join("\n"),
+        aiAnalysis ? `\n### AI Analysis (Qwen via Nosana)\n${aiAnalysis}` : "",
         ``,
         `> Use ASSESS_PROTOCOL_RISK to evaluate the protocol this contract belongs to.`,
       ].filter(Boolean).join("\n");

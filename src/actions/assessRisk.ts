@@ -1,9 +1,10 @@
 /**
  * ASSESS_PROTOCOL_RISK
- * Performs a real-time risk assessment of a DeFi protocol by fetching
- * TVL data from DefiLlama and analyzing across 5 risk categories.
+ * Fetches live TVL data from DefiLlama, then uses the Nosana-hosted Qwen
+ * LLM (via ElizaOS generateText) to produce expert security commentary.
  */
 
+import { generateText, ModelClass } from "@elizaos/core";
 import type { Action, IAgentRuntime, Memory, State, HandlerCallback, HandlerOptions } from "@elizaos/core";
 
 const DEFILLAMA_API = "https://api.llama.fi";
@@ -58,9 +59,8 @@ export const assessRiskAction: Action = {
     return text.includes("risk") || text.includes("assess") || text.includes("analyze") ||
            text.includes("safe") || text.includes("security") || text.includes("how secure");
   },
-  handler: async (_runtime: IAgentRuntime, message: Memory, _state?: State, _options?: HandlerOptions, callback?: HandlerCallback) => {
+  handler: async (runtime: IAgentRuntime, message: Memory, _state?: State, _options?: HandlerOptions, callback?: HandlerCallback) => {
     const text = message.content?.text || "";
-    // Extract protocol name — look for known patterns
     const nameMatch = text.match(/(?:risk|assess|analyze|security|safe)\s+(?:of\s+)?(?:the\s+)?([A-Za-z0-9\s.]+?)(?:\s+protocol|\s+v\d|\s*$)/i)
       || text.match(/(?:is\s+)([A-Za-z0-9\s.]+?)(?:\s+safe|\s+risky|\s+secure)/i);
 
@@ -70,6 +70,8 @@ export const assessRiskAction: Action = {
       if (callback) await callback({ text: "Please specify a protocol name. Example: 'Assess the risk of Aave V3'" });
       return;
     }
+
+    if (callback) await callback({ text: `Fetching live data for **${protocolName}** from DefiLlama...` });
 
     const data = await fetchProtocolData(protocolName);
 
@@ -89,6 +91,18 @@ export const assessRiskAction: Action = {
 
     const formatUsd = (n: number) => n >= 1e9 ? `$${(n/1e9).toFixed(2)}B` : n >= 1e6 ? `$${(n/1e6).toFixed(1)}M` : `$${(n/1e3).toFixed(0)}K`;
 
+    // Generate AI-powered expert commentary via Nosana-hosted Qwen model
+    const dataContext = `Protocol: ${data.name} | Category: ${category} | TVL: ${formatUsd(tvl)} | Chains: ${(data.chains || []).join(", ")} | 24h: ${change1d !== null ? change1d.toFixed(2) + "%" : "N/A"} | 7d: ${change7d !== null ? change7d.toFixed(2) + "%" : "N/A"} | Flags: ${risks.join("; ")}`;
+
+    let aiCommentary = "";
+    try {
+      aiCommentary = await generateText({
+        runtime,
+        context: `You are Axiom, a DeFi security analyst running on Nosana's decentralised GPU network. Based on these live metrics for ${data.name}, provide a 3-4 sentence expert security commentary. Be specific about the key risks, what to watch for, and any actionable conclusions. Do not repeat the raw numbers — interpret them.\n\nData: ${dataContext}`,
+        modelClass: ModelClass.LARGE,
+      });
+    } catch { /* LLM unavailable — fallback to structured report */ }
+
     const report = [
       `## Risk Assessment: ${data.name}`,
       ``,
@@ -100,16 +114,17 @@ export const assessRiskAction: Action = {
       `| 24h Change | ${change1d !== null ? change1d.toFixed(2) + "%" : "N/A"} |`,
       `| 7d Change | ${change7d !== null ? change7d.toFixed(2) + "%" : "N/A"} |`,
       ``,
-      `### Risk Categories`,
+      `### Risk Flags`,
       risks.map((r, i) => `${i + 1}. ${r}`).join("\n"),
+      aiCommentary ? `\n### AI Analysis (Qwen via Nosana)\n${aiCommentary}` : "",
       ``,
-      `> Use INSPECT_CONTRACT with a specific address for deeper on-chain analysis.`,
-    ].join("\n");
+      `> Use INSPECT_CONTRACT with a contract address for deeper on-chain analysis.`,
+    ].filter(l => l !== undefined).join("\n");
 
     if (callback) await callback({ text: report });
   },
   examples: [[
     { name: "user", content: { text: "Assess the risk of Aave V3" } },
-    { name: "Axiom", content: { text: "Analyzing Aave V3 risk profile using live DefiLlama data..." } },
+    { name: "Axiom", content: { text: "Fetching live data for **Aave V3** from DefiLlama..." } },
   ]],
 };
