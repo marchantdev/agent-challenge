@@ -219,6 +219,32 @@ export default function Dashboard({ onNavigate }: { onNavigate: (v: View) => voi
         />
       </div>
 
+      {/* Analysis Pipeline Visualization */}
+      <div className="card bg-zinc-900/50">
+        <p className="text-[10px] text-zinc-600 uppercase tracking-widest mb-3">Analysis Pipeline</p>
+        <div className="flex items-center gap-1 flex-wrap">
+          {[
+            { label: "Data Sources", icon: "⬡", color: "bg-blue-950/60 border-blue-800/50 text-blue-300" },
+            { label: "Constraint Analysis", icon: "⚙", color: "bg-violet-950/60 border-violet-800/50 text-violet-300" },
+            { label: "AI Assessment", icon: "◈", color: "bg-amber-950/60 border-amber-800/50 text-amber-300" },
+            { label: "Security Score", icon: "◎", color: "bg-emerald-950/60 border-emerald-800/50 text-emerald-300" },
+            { label: "Alert", icon: "◉", color: "bg-red-950/60 border-red-800/50 text-red-300" },
+          ].map((step, i, arr) => (
+            <div key={step.label} className="flex items-center gap-1">
+              <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-xs font-medium ${step.color}`}>
+                <span className="text-[11px]">{step.icon}</span>
+                {step.label}
+              </div>
+              {i < arr.length - 1 && (
+                <svg className="w-3 h-3 text-zinc-700 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                </svg>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+
       {/* Anomaly Alerts */}
       <AnomalyAlerts protocols={protocols} onNavigate={onNavigate} />
 

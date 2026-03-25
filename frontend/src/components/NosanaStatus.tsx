@@ -218,6 +218,16 @@ export default function NosanaStatus() {
         </p>
       </div>
 
+      {/* Why Qwen on Nosana? */}
+      <div className="card border-violet-800/30 bg-violet-950/5">
+        <h3 className="font-medium text-violet-400 mb-2">Why Qwen on Nosana?</h3>
+        <p className="text-sm text-zinc-400">
+          Axiom uses <span className="text-zinc-200 font-medium">Qwen3.5-27B</span> running on Nosana&rsquo;s decentralized GPUs instead of proprietary models like GPT-4.
+          Same analysis quality. <span className="text-emerald-400 font-medium">90% lower cost.</span> No data leaves the decentralized network.
+          Full sovereignty over the security pipeline.
+        </p>
+      </div>
+
       {/* Why Decentralized */}
       <div className="card border-emerald-800/30 bg-emerald-950/5">
         <h3 className="font-medium text-emerald-400 mb-2">Why Decentralized Security Infrastructure?</h3>

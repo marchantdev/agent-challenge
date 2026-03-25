@@ -159,6 +159,8 @@ Talk to Axiom in natural language. Here are example queries for each of the 10 a
 
 Axiom exposes a programmatic Security Score endpoint. Any agent or service can query Axiom for a protocol's security score without going through the chat interface — making Axiom a composable **security oracle**.
 
+Axiom is a composable security oracle on Nosana's decentralized compute network. Other agents can query it for protocol safety scores before making DeFi decisions — enabling agent-to-agent security verification on decentralized infrastructure.
+
 ```
 GET /api/security-score/:protocol
 ```
