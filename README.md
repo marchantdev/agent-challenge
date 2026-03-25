@@ -1,108 +1,187 @@
-# Axiom — DeFi Intelligence Agent 🔍
+# Axiom — Decentralized DeFi Security Operations Center
 
-**Personal AI security analyst for DeFi protocols, deployed on Nosana's decentralised compute network.**
-
-> *"Every DeFi user deserves the same quality of analysis that institutional players get."*
+> Security infrastructure that's as decentralized as the protocols it protects. Powered by Nosana + ElizaOS.
 
 ---
 
-## What Is Axiom?
+## Architecture
 
-Axiom is a persistent personal AI agent that specialises in:
+```
+┌───────────────────────────────────────────────────────┐
+│                    Nosana GPU Node                     │
+│                                                       │
+│  ┌─────────────┐    ┌──────────────────────────────┐  │
+│  │  React UI   │───▶│     ElizaOS Agent Runtime     │  │
+│  │  (port 8080)│◀───│       (port 3000)             │  │
+│  │             │    │                                │  │
+│  │  Dashboard  │    │  ┌─────────────────────────┐  │  │
+│  │  Chat       │    │  │   Axiom Security Plugin  │  │  │
+│  │  Scanner    │    │  │   8 Custom Actions        │  │  │
+│  │  Protocols  │    │  │                           │  │  │
+│  │  Nosana     │    │  │   DefiLlama ←──── TVL     │  │  │
+│  │             │    │  │   Etherscan ←──── Chain    │  │  │
+│  │             │    │  │   GitHub    ←──── Repos    │  │  │
+│  │             │    │  │   Immunefi  ←──── Bounties │  │  │
+│  └─────────────┘    │  └─────────────────────────┘  │  │
+│                     │                                │  │
+│                     │  Model: Qwen3.5-27B-AWQ-4bit   │  │
+│                     └──────────────────────────────┘  │
+└───────────────────────────────────────────────────────┘
+```
 
-- **Protocol risk assessment** — Systematic analysis of trust models, invariants, and attack surfaces
-- **Smart contract security** — Structured explanations of vulnerability patterns (reentrancy, flash loans, oracle manipulation, access control)
-- **DeFi yield research** — Risk-aware yield opportunity analysis across Ethereum, Solana, and L2s
-- **On-chain investigation** — Methodology for tracing transactions and verifying protocol claims
+## Features
 
-Built with [ElizaOS v2](https://elizaos.com) and powered by the **Qwen3.5-27B** model provided by Nosana.
+### Custom React Dashboard (5 Views)
+
+- **Dashboard** — Live stat cards, TVL bar chart, exploit timeline, attack vector distribution, TVL anomaly alerts
+- **Chat** — Conversation with Axiom agent, markdown rendering, structured risk reports, suggestion chips
+- **Scanner** — Paste any Ethereum address for instant analysis (verification, proxy detection, compiler version)
+- **Protocols** — Searchable/sortable table of top 100 DeFi protocols with risk indicators and anomaly badges
+- **Nosana Status** — Deployment health, inference metrics, network node count, GPU types, "Why Decentralized?" section
+
+### 8 Dynamic Actions (Custom ElizaOS Plugin)
+
+| Action | Data Source | Description |
+|--------|-----------|-------------|
+| `ASSESS_PROTOCOL_RISK` | DefiLlama API | Real-time 5-category risk assessment with live TVL, volatility, and chain data |
+| `EXPLAIN_VULNERABILITY` | Curated DB + examples | Reentrancy, flash loans, oracle manipulation, bridge exploits, access control |
+| `SCAN_DEFI_TVL` | DefiLlama API | Live TVL rankings with category/chain filters and anomaly detection |
+| `INSPECT_CONTRACT` | Etherscan API | Balance, verification, proxy detection, compiler version, deployer info |
+| `EXPLOIT_HISTORY` | Curated DB (25+) | Filterable exploit database by chain, category, technique, and amount |
+| `SCAN_BOUNTIES` | Immunefi API | Live bug bounty program scanner with reward tiers |
+| `AUDIT_RECON` | GitHub API | Recent commits, audit indicators, repo health for any GitHub repository |
+| `NOSANA_STATUS` | Process + Nosana API | Live deployment health, memory usage, network stats, infrastructure awareness |
+
+### Nosana Integration
+
+- **Deployed on Nosana GPU nodes** (NVIDIA RTX 3090)
+- **Health endpoints** — `/api/health` and `/api/metrics` serving real operational data
+- **Network awareness** — Agent knows about Nosana node count, GPU types, and its own deployment status
+- **CI/CD pipeline** — GitHub Actions builds Docker image on every push to `main`
+- **Network-aware character** — Agent explains why decentralized compute matters for security tooling
+
+### Health & Metrics Endpoints
+
+```
+GET /api/health
+{
+  "status": "healthy",
+  "uptimeSeconds": 84321,
+  "inferenceLatencyMs": 342,
+  "actionsTriggered": 1847,
+  "nosanaNode": "4HXAjRna...",
+  "model": "Qwen3.5-27B-AWQ-4bit"
+}
+
+GET /api/metrics
+{
+  "requestsTotal": 2841,
+  "requestsByAction": { "ASSESS_PROTOCOL_RISK": 423, ... },
+  "avgResponseTimeMs": 1240,
+  "errorRate": 0.02
+}
+```
 
 ---
 
-## Why Axiom on Nosana?
+## Quick Start
 
-Running Axiom on Nosana's decentralised GPU network demonstrates something important: **AI sovereignty is already possible.** Your personal security analyst doesn't need to depend on AWS, Azure, or any centralised provider.
+### Local Development
 
-- **Decentralised** — No single point of failure
-- **Permissionless** — No KYC, no gatekeeping  
-- **Private** — Your research queries don't go to Big Tech
-- **Sovereign** — You control the infrastructure
+```bash
+# Clone
+git clone https://github.com/marchantdev/agent-challenge.git
+cd agent-challenge
+
+# Install dependencies
+pnpm install
+cd frontend && npm install && cd ..
+
+# Configure environment
+cp .env.example .env
+# Edit .env with your API keys
+
+# Run
+pnpm dev
+```
+
+### Docker Build
+
+```bash
+docker build -t axiom .
+docker run -p 3000:3000 -p 8080:8080 --env-file .env axiom
+```
+
+### Deploy to Nosana
+
+```bash
+# Get builders credits at nosana.com/builders-credits
+nosana job post \
+  --file ./nos_job_def/nosana_eliza_job_definition.json \
+  --market nvidia-3090 \
+  --timeout 300
+```
 
 ---
 
-## Custom Plugin: Axiom DeFi Intelligence
+## Project Structure
 
-Beyond the base ElizaOS chat functionality, Axiom includes **5 custom actions**:
+```
+├── frontend/               # React dashboard (Vite + TypeScript + Tailwind)
+│   └── src/
+│       ├── components/     # Dashboard, Chat, Scanner, Protocols, NosanaStatus
+│       ├── lib/            # API client, types
+│       └── styles/         # Tailwind globals
+├── src/                    # ElizaOS agent plugin
+│   ├── actions/            # 8 custom actions (each in own file)
+│   ├── types/              # Shared TypeScript interfaces
+│   ├── utils/              # API helpers, formatting
+│   ├── character.ts        # Axiom character definition
+│   ├── plugin.ts           # Plugin registration
+│   ├── server.ts           # Frontend server + proxy + health endpoints
+│   └── index.ts            # Project entry point
+├── characters/             # Character JSON
+├── nos_job_def/            # Nosana job definition
+├── .github/workflows/      # CI/CD pipeline
+├── Dockerfile              # Multi-stage build (frontend + agent)
+└── README.md
+```
 
-### `ASSESS_PROTOCOL_RISK`
-Triggered when you ask Axiom to audit or assess a protocol. Provides a structured 5-point framework:
-1. Trust model (who can do what)
-2. Invariant identification (what must always hold)
-3. Economic attack surface (oracle manipulation, flash loans)
-4. Composability risks (external call dangers)
-5. Upgrade risk (proxy pattern vulnerabilities)
+---
 
-### `EXPLAIN_VULNERABILITY`
-Deep explanations of smart contract vulnerability patterns with real exploit examples and code-level mitigations. Covers 7 vulnerability classes:
-- **Reentrancy** (including cross-function, cross-contract, and read-only variants)
-- **Flash loan attacks** (with real examples: Mango Markets, Beanstalk, Harvest)
-- **Oracle manipulation** (AMM spot price, Chainlink staleness, sequencer downtime)
-- **Access control failures** (missing modifiers, re-initialisation, two-step ownership)
-- **Integer overflow/underflow** (unchecked blocks, unsafe casting, rounding direction)
-- **MEV / sandwich attacks** (front-running, governance attacks, JIT liquidity)
-- **Storage collision** (proxy patterns, UUPS vs Transparent, initialisation attacks)
+## Why Decentralized Security Infrastructure?
 
-### `SCAN_DEFI_TVL` *(NEW)*
-Fetches live TVL rankings from DefiLlama API. Supports category filters: lending, DEX/AMM, yield, or all. Shows top 10 protocols with 24h change data.
+Security tooling running on centralized cloud has a single point of failure. If the provider is compromised, rate-limits your API, or censors your analysis — the tool stops working.
 
-### `INSPECT_CONTRACT` *(NEW)*
-Inspects any Ethereum contract address — fetches balance, transaction count, and verified source code status via Etherscan. Triggered by any 0x address in the message.
+Axiom runs on Nosana's decentralized GPU network — a Solana-based compute marketplace of independent node operators. This provides:
 
-### `EXPLOIT_HISTORY` *(NEW)*
-Curated database of major DeFi hacks with attack vectors, amounts lost, and chain. Supports filtering by chain (Solana, BSC, Ethereum) or keyword. Covers 12+ major incidents from The DAO (2016) to Ronin Bridge (2022).
+- **Censorship resistance** — No single entity can shut down or restrict security analysis
+- **Trust minimization** — No centralized infrastructure to compromise
+- **Always available** — GPU compute sourced from a marketplace; if one node goes down, jobs migrate
+
+> The same trustless ethos as the DeFi protocols it protects.
 
 ---
 
 ## Deployment
 
-**Docker Image:** `ghcr.io/marchantdev/agent-challenge:latest`
-**Live Deployment:** `https://4HXAjRna3oV9FCinnT1uTrRm74Qri8spbLT54dced3rz.node.k8s.prd.nos.ci`
-
-**Nosana Job Definition:** See `nos_job_def/nosana_eliza_job_definition.json`
-
-**Automated Build:** Every push to `main` triggers a GitHub Actions workflow that builds and pushes the Docker image to GHCR.
-
-### Quick Deploy on Nosana
-
-```bash
-# 1. Get your Nosana builders credits at nosana.com/builders-credits
-
-# 2. Deploy the agent
-nosana job post \
-  --file ./nos_job_def/nosana_eliza_job_definition.json \
-  --market nvidia-3090-community \
-  --timeout 60
-
-# 3. Get your deployment URL from the job output
-```
+- **Docker Image:** `ghcr.io/marchantdev/agent-challenge:latest`
+- **CI/CD:** GitHub Actions auto-builds on push to `main`
 
 ---
 
-## Example Interactions
+## Tech Stack
 
-**Reentrancy attack explanation:**
-> "Reentrancy — The most famous DeFi vulnerability class. A contract calls an external address *before* updating its own state. The DAO hack ($60M, 2016) used this exact pattern..."
-
-**Protocol risk assessment:**
-> "**Axiom Risk Assessment Framework:** Start with the trust model — who are the privileged actors? What can they do unilaterally?..."
-
-**Yield research:**
-> "For ETH: Native staking ~3.5% base. Liquid staking (stETH/rETH) adds ~0.1-0.2% via MEV. EigenLayer restaking adds variable AVS rewards..."
+| Layer | Technology |
+|-------|-----------|
+| Agent Framework | ElizaOS v1 |
+| LLM | Qwen3.5-27B-AWQ-4bit |
+| Frontend | React 19 + Vite 6 + TypeScript + Tailwind CSS |
+| Compute | Nosana decentralized GPU (RTX 3090) |
+| APIs | DefiLlama, Etherscan, GitHub, Immunefi, Nosana |
+| Container | Docker (multi-stage build) |
+| CI/CD | GitHub Actions |
 
 ---
-
-## Built By
 
 Built by [marchantdev](https://github.com/marchantdev) for the **Nosana x ElizaOS Builder Challenge 2026**.
-
-*This submission embodies the OpenClaw philosophy: your AI, running on infrastructure you control.*

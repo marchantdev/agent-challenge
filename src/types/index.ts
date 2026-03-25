@@ -6,6 +6,7 @@ export interface Protocol {
   change_7d: number | null;
   category: string;
   chains: string[];
+  audits?: number;
 }
 
 export interface Exploit {
@@ -14,6 +15,7 @@ export interface Exploit {
   amount: number;
   chain: string;
   technique: string;
+  category?: string;
 }
 
 export interface ContractInfo {
@@ -24,4 +26,27 @@ export interface ContractInfo {
   verified: boolean;
   contractName: string;
   isProxy: boolean;
+  implementation?: string;
+  compilerVersion?: string;
+  deployer?: string;
+  deployDate?: string;
+}
+
+export interface RiskAssessment {
+  protocol: string;
+  tvl: number;
+  categories: RiskCategory[];
+  overallRisk: "Critical" | "High" | "Medium" | "Low";
+}
+
+export interface RiskCategory {
+  name: string;
+  level: "Critical" | "High" | "Medium" | "Low" | "Unknown";
+  detail: string;
+}
+
+export interface NosanaNetworkInfo {
+  totalNodes: number;
+  activeJobs: number;
+  gpuTypes: string[];
 }
