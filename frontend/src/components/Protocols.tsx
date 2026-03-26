@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import type { Protocol, View } from "../lib/types";
 import { fetchProtocols, formatUsd } from "../lib/api";
+import { ChainBadge } from "./ChainBadge";
 
 function ChangeCell({ value }: { value: number | null }) {
   if (value === null || value === undefined) return <span className="text-zinc-600">&mdash;</span>;
@@ -188,9 +189,15 @@ export default function Protocols({ onNavigate }: { onNavigate?: (v: View) => vo
                     <td className="px-2 py-2.5 text-center"><RiskIndicator protocol={p} /></td>
                     <td className="px-4 py-2.5 font-medium">{p.name}</td>
                     <td className="px-4 py-2.5 text-zinc-400 text-xs">{p.category}</td>
-                    <td className="px-4 py-2.5 text-zinc-500 text-xs font-mono">
-                      {p.chains.slice(0, 3).join(", ")}
-                      {p.chains.length > 3 && ` +${p.chains.length - 3}`}
+                    <td className="px-4 py-2.5">
+                      <div className="flex flex-wrap gap-1">
+                        {p.chains.slice(0, 3).map((c) => (
+                          <ChainBadge key={c} chain={c} size="xs" />
+                        ))}
+                        {p.chains.length > 3 && (
+                          <span className="text-[9px] text-zinc-600 self-center">+{p.chains.length - 3}</span>
+                        )}
+                      </div>
                     </td>
                     <td className="px-4 py-2.5 text-right font-mono">{formatUsd(p.tvl)}</td>
                     <td className="px-4 py-2.5 text-right font-mono text-xs"><ChangeCell value={p.change_1d} /></td>

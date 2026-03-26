@@ -90,7 +90,19 @@ export default function Layout({
       </nav>
 
       {/* Main content */}
-      <main className="flex-1 overflow-y-auto p-6">{children}</main>
+      <main className="flex-1 overflow-y-auto p-6 pb-12">{children}</main>
+
+      {/* Footer attribution */}
+      <footer className="fixed bottom-0 left-16 right-0 bg-zinc-950/90 border-t border-zinc-800/50 backdrop-blur-sm px-4 py-1.5 flex items-center justify-center gap-2">
+        <span className="text-[10px] text-zinc-600">
+          Powered by{" "}
+          <a href="https://nosana.io" target="_blank" rel="noopener noreferrer" className="text-emerald-600 hover:text-emerald-500 transition-colors">
+            Nosana GPU Network
+          </a>
+          {" "}&middot;{" "}
+          Built with ElizaOS v2
+        </span>
+      </footer>
     </div>
   );
 }

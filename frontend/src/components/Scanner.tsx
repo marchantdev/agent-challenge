@@ -1,6 +1,8 @@
 import React, { useState } from "react";
 import { sendMessage } from "../lib/api";
 import { renderMarkdown } from "../lib/markdown";
+import { ChainBadge, detectChain } from "./ChainBadge";
+import SecurityGauge, { parseSecurityScore } from "./SecurityGauge";
 
 interface ScanResult {
   address: string;
@@ -16,6 +18,9 @@ function ResultCard({ result }: { result: ScanResult }) {
         <div className="flex items-center gap-2">
           <span className="w-5 h-5 rounded bg-emerald-600 flex items-center justify-center text-[10px] font-bold text-white shrink-0">A</span>
           <span className="text-[10px] text-emerald-400 font-semibold tracking-wide">AXIOM</span>
+          {detectChain(result.address) !== "unknown" && (
+            <ChainBadge chain={detectChain(result.address)} size="xs" />
+          )}
           <span className="text-xs text-zinc-500 font-mono truncate max-w-[200px] sm:max-w-xs">{result.address}</span>
         </div>
         <span className="text-[10px] text-zinc-600">{new Date(result.timestamp).toLocaleTimeString()}</span>
@@ -23,7 +28,22 @@ function ResultCard({ result }: { result: ScanResult }) {
       {result.error ? (
         <p className="text-red-400 text-sm">{result.error}</p>
       ) : (
-        renderMarkdown(result.text || "")
+        <>
+          {renderMarkdown(result.text || "")}
+          {(() => {
+            const parsed = parseSecurityScore(result.text || "");
+            if (!parsed) return null;
+            return (
+              <div className="mt-3 pt-3 border-t border-zinc-800 flex justify-center">
+                <SecurityGauge
+                  score={parsed.score}
+                  components={parsed.components.length > 0 ? parsed.components : undefined}
+                  size={140}
+                />
+              </div>
+            );
+          })()}
+        </>
       )}
     </div>
   );
@@ -62,7 +82,13 @@ export default function Scanner() {
     <div className="max-w-4xl mx-auto space-y-6">
       <div>
         <h1 className="text-2xl font-bold">Contract Scanner</h1>
-        <p className="text-sm text-zinc-500">Analyze any smart contract for security signals — Ethereum and Solana supported</p>
+        <p className="text-sm text-zinc-500">Analyze any smart contract for security signals</p>
+        <div className="flex items-center gap-2 mt-1.5">
+          <span className="text-[10px] text-zinc-600 uppercase tracking-wider">Supports:</span>
+          <ChainBadge chain="ethereum" size="xs" />
+          <span className="text-zinc-700 text-[10px]">+</span>
+          <ChainBadge chain="solana" size="xs" />
+        </div>
       </div>
 
       {/* Input */}

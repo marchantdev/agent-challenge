@@ -139,7 +139,7 @@ GET /api/metrics
 
 ## What You Can Ask Axiom
 
-Talk to Axiom in natural language. Here are example queries for each of the 10 actions:
+Talk to Axiom in natural language. Here are example queries for each of the 12 actions:
 
 | Action | Example Query |
 |--------|---------------|
@@ -154,6 +154,8 @@ Talk to Axiom in natural language. Here are example queries for each of the 10 a
 | `AUDIT_RECON` | "Audit recon on https://github.com/aave/aave-v3-core" |
 | `NOSANA_STATUS` | "Show Nosana network status" |
 | `MONITOR_PROTOCOL` | "Monitor Aave" then "Check watchlist" |
+| `COMPARE_PROTOCOLS` | "Compare Aave and Compound" |
+| `GENERATE_AUDIT_REPORT` | "Generate audit report for Uniswap" |
 
 ---
 
@@ -297,7 +299,7 @@ nosana job post \
 │       ├── lib/            # API client, types
 │       └── styles/         # Tailwind globals
 ├── src/                    # ElizaOS agent plugin
-│   ├── actions/            # 10 custom actions (each in own file)
+│   ├── actions/            # 12 custom actions (each in own file)
 │   ├── types/              # Shared TypeScript interfaces
 │   ├── utils/              # Shared API helpers (formatUsd, cachedFetch, ethRpc, solanaRpc)
 │   ├── character.ts        # Axiom character definition

@@ -12,10 +12,9 @@
 import { generateText, ModelClass } from "@elizaos/core";
 import type { Action, IAgentRuntime, Memory, State, HandlerCallback, HandlerOptions } from "@elizaos/core";
 import { computeSecurityScore } from "./assessRisk.ts";
+import { checkContractVerification as checkVerificationV2 } from "../utils/ethRpc.ts";
 
 const DEFILLAMA_API = "https://api.llama.fi";
-const ETHERSCAN_API = "https://api.etherscan.io/api";
-const API_KEY = process.env.ETHERSCAN_API_KEY || "";
 
 // ─── helpers ────────────────────────────────────────────────────────────────
 
@@ -63,18 +62,11 @@ async function fetchRelatedExploits(protocolName: string): Promise<Array<{ name:
 async function checkContractVerification(address: string): Promise<{ verified: boolean; name: string; isProxy: boolean } | null> {
   if (!address || !address.startsWith("0x")) return null;
   try {
-    const res = await fetch(
-      `${ETHERSCAN_API}?module=contract&action=getsourcecode&address=${address}&apikey=${API_KEY}`,
-      { signal: AbortSignal.timeout(8000) }
-    );
-    if (!res.ok) return null;
-    const data = (await res.json()) as any;
-    const src = data.result?.[0];
-    if (!src) return null;
+    const status = await checkVerificationV2(address);
     return {
-      verified: Boolean(src.SourceCode),
-      name: src.ContractName || "Unknown",
-      isProxy: src.Proxy === "1",
+      verified: status === "verified",
+      name: "Contract",
+      isProxy: false,
     };
   } catch { return null; }
 }

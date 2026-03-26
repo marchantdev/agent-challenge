@@ -58,9 +58,16 @@ export default function NosanaStatus() {
   return (
     <div className="max-w-5xl mx-auto space-y-6">
       <div className="flex items-end justify-between">
-        <div>
-          <h1 className="text-2xl font-bold">Nosana Infrastructure</h1>
-          <p className="text-sm text-zinc-500">Decentralized GPU compute &mdash; deployment health & network status</p>
+        <div className="flex items-center gap-3">
+          {/* Nosana Logo */}
+          <svg className="w-10 h-10 shrink-0" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <rect width="40" height="40" rx="10" fill="#10B981" fillOpacity="0.15" />
+            <path d="M12 28V12l16 16V12" stroke="#10B981" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+          <div>
+            <h1 className="text-2xl font-bold">Nosana Infrastructure</h1>
+            <p className="text-sm text-zinc-500">Decentralized GPU compute &mdash; deployment health & network status</p>
+          </div>
         </div>
         <button
           onClick={loadData}

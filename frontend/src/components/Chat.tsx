@@ -2,6 +2,8 @@ import React, { useState, useRef, useEffect } from "react";
 import type { ChatMessage } from "../lib/types";
 import { sendMessage } from "../lib/api";
 import { renderMarkdown } from "../lib/markdown";
+import { ChainBadge } from "./ChainBadge";
+import SecurityGauge, { parseSecurityScore } from "./SecurityGauge";
 
 const SUGGESTIONS = [
   "Assess Aave V3 risk",
@@ -28,13 +30,33 @@ function MessageBubble({ msg }: { msg: ChatMessage }) {
             <span className="w-5 h-5 rounded bg-emerald-600 flex items-center justify-center text-[10px] font-bold text-white">A</span>
             <span className="text-[10px] text-emerald-400 font-semibold tracking-wide">AXIOM</span>
             {msg.action && <span className="badge-info text-[9px] ml-1">{msg.action}</span>}
+            {/\b(ethereum|eth|erc-?20|solidity)\b/i.test(msg.text) && <ChainBadge chain="ethereum" size="xs" />}
+            {/\b(solana|sol|spl|anchor)\b/i.test(msg.text) && <ChainBadge chain="solana" size="xs" />}
           </div>
         )}
         <div className="leading-relaxed">
           {isUser ? msg.text : renderMarkdown(msg.text)}
         </div>
-        <div className="text-[10px] text-zinc-600 mt-2 text-right">
-          {new Date(msg.timestamp).toLocaleTimeString()}
+        {!isUser && (() => {
+          const parsed = parseSecurityScore(msg.text);
+          if (!parsed) return null;
+          return (
+            <div className="mt-3 pt-3 border-t border-zinc-700/50 flex justify-center">
+              <SecurityGauge
+                score={parsed.score}
+                components={parsed.components.length > 0 ? parsed.components : undefined}
+                size={140}
+              />
+            </div>
+          );
+        })()}
+        <div className="flex items-center justify-between mt-2">
+          {!isUser && (
+            <span className="text-[9px] text-zinc-600">Inference: Qwen3.5-27B on Nosana GPU</span>
+          )}
+          <span className={`text-[10px] text-zinc-600 ${isUser ? "" : "ml-auto"}`}>
+            {new Date(msg.timestamp).toLocaleTimeString()}
+          </span>
         </div>
       </div>
     </div>

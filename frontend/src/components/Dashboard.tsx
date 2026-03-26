@@ -1,7 +1,92 @@
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import type { View, Protocol, Exploit } from "../lib/types";
 import { fetchProtocols, getExploits, getTotalExploitLoss, fetchHealth, detectAnomalies, formatUsd, getExploitsByTechnique, fetchExploitsLive } from "../lib/api";
 
+/* ─── Count-up animation hook ─── */
+function useCountUp(target: number, duration = 1200): number {
+  const [display, setDisplay] = useState(0);
+  const currentRef = useRef(0);
+  const frameRef = useRef(0);
+
+  useEffect(() => {
+    const from = currentRef.current;
+    if (from === target) return;
+    const startTime = performance.now();
+    cancelAnimationFrame(frameRef.current);
+
+    const tick = (now: number) => {
+      const t = Math.min((now - startTime) / duration, 1);
+      const eased = 1 - Math.pow(1 - t, 3); // ease-out cubic
+      const val = from + (target - from) * eased;
+      currentRef.current = val;
+      setDisplay(val);
+      if (t < 1) frameRef.current = requestAnimationFrame(tick);
+    };
+    frameRef.current = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(frameRef.current);
+  }, [target, duration]);
+
+  return display;
+}
+
+/* ─── Animated stat card with count-up + change flash + anomaly pulse ─── */
+function AnimatedStatCard({
+  label,
+  numericValue,
+  formatter,
+  sub,
+  accent,
+  anomaly,
+}: {
+  label: string;
+  numericValue: number;
+  formatter: (n: number) => string;
+  sub?: string;
+  accent?: string;
+  anomaly?: boolean;
+}) {
+  const animated = useCountUp(numericValue);
+
+  // Change-direction flash (skip initial load)
+  const [flashClass, setFlashClass] = useState("");
+  const prevVal = useRef<number | null>(null);
+  const loadCount = useRef(0);
+
+  useEffect(() => {
+    loadCount.current++;
+    if (loadCount.current <= 1) {
+      prevVal.current = numericValue;
+      return;
+    }
+    if (prevVal.current !== null) {
+      if (numericValue > prevVal.current) setFlashClass("flash-up");
+      else if (numericValue < prevVal.current) setFlashClass("flash-down");
+    }
+    prevVal.current = numericValue;
+  }, [numericValue]);
+
+  useEffect(() => {
+    if (!flashClass) return;
+    const t = setTimeout(() => setFlashClass(""), 1600);
+    return () => clearTimeout(t);
+  }, [flashClass]);
+
+  return (
+    <div
+      className={`card group hover:border-zinc-700 transition-colors ${flashClass} ${
+        anomaly ? "animate-anomaly-pulse" : ""
+      }`}
+    >
+      <p className="text-xs text-zinc-500 uppercase tracking-wider">{label}</p>
+      <p className={`text-2xl font-bold mt-1 font-mono ${accent || "text-zinc-100"}`}>
+        {formatter(animated)}
+      </p>
+      {sub && <p className="text-xs text-zinc-500 mt-1">{sub}</p>}
+    </div>
+  );
+}
+
+/* ─── Simple stat card (for non-numeric values) ─── */
 function StatCard({ label, value, sub, accent }: { label: string; value: string; sub?: string; accent?: string }) {
   return (
     <div className="card group hover:border-zinc-700 transition-colors">
@@ -168,6 +253,7 @@ export default function Dashboard({ onNavigate }: { onNavigate: (v: View) => voi
   const avgChange = protocols.length > 0
     ? protocols.reduce((s, p) => s + (p.change_1d || 0), 0) / protocols.length
     : 0;
+  const hasAnomalies = detectAnomalies(protocols).length > 0;
 
   return (
     <div className="max-w-6xl mx-auto space-y-6">
@@ -177,6 +263,9 @@ export default function Dashboard({ onNavigate }: { onNavigate: (v: View) => voi
           <h1 className="text-2xl font-bold">Security Operations Center</h1>
           <p className="text-sm text-zinc-500">
             Real-time DeFi intelligence &mdash; powered by Nosana decentralized compute
+          </p>
+          <p className="text-[10px] text-zinc-600 mt-1">
+            Cross-chain security monitoring &mdash; Ethereum + Solana &mdash; no centralized servers
           </p>
         </div>
         <div className="flex items-center gap-3">
@@ -203,14 +292,27 @@ export default function Dashboard({ onNavigate }: { onNavigate: (v: View) => voi
 
       {/* Stat Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <StatCard label="Protocols Monitored" value={loading ? "..." : String(protocols.length)} sub="via DefiLlama API" />
-        <StatCard
+        <AnimatedStatCard
+          label="Protocols Monitored"
+          numericValue={loading ? 0 : protocols.length}
+          formatter={(n) => String(Math.round(n))}
+          sub="via DefiLlama API"
+        />
+        <AnimatedStatCard
           label="Total TVL"
-          value={loading ? "..." : formatUsd(totalTvl)}
+          numericValue={loading ? 0 : totalTvl}
+          formatter={formatUsd}
           sub={`Market ${avgChange >= 0 ? "+" : ""}${avgChange.toFixed(1)}% (24h)`}
           accent={avgChange >= 0 ? "text-emerald-400" : "text-red-400"}
+          anomaly={hasAnomalies}
         />
-        <StatCard label="Tracked Exploit Losses" value={formatUsd(totalLoss)} sub={`${exploits.length} incidents analyzed`} accent="text-red-400" />
+        <AnimatedStatCard
+          label="Tracked Exploit Losses"
+          numericValue={totalLoss}
+          formatter={formatUsd}
+          sub={`${exploits.length} incidents analyzed`}
+          accent="text-red-400"
+        />
         <StatCard
           label="Nosana Status"
           value={healthStatus === "healthy" ? "Online" : healthStatus}
