@@ -11,33 +11,11 @@
 
 import { ModelType } from "@elizaos/core";
 import type { Action, IAgentRuntime, Memory, State, HandlerCallback, HandlerOptions } from "@elizaos/core";
-import { computeSecurityScore } from "./assessRisk.ts";
+import { computeSecurityScore, fetchProtocolData as fetchProtocol } from "./assessRisk.ts";
 import { checkContractVerification as checkVerificationV2 } from "../utils/ethRpc.ts";
+import { formatUsd } from "../utils/api.js";
 
 const DEFILLAMA_API = "https://api.llama.fi";
-
-// ─── helpers ────────────────────────────────────────────────────────────────
-
-function formatUsd(n: number): string {
-  if (n >= 1e9) return `$${(n / 1e9).toFixed(2)}B`;
-  if (n >= 1e6) return `$${(n / 1e6).toFixed(1)}M`;
-  return `$${(n / 1e3).toFixed(0)}K`;
-}
-
-async function fetchProtocol(name: string): Promise<any | null> {
-  try {
-    const res = await fetch(`${DEFILLAMA_API}/protocols`, { signal: AbortSignal.timeout(10000) });
-    if (!res.ok) return null;
-    const protocols = (await res.json()) as any[];
-    return protocols.find(
-      (p: any) =>
-        p.name.toLowerCase() === name.toLowerCase() ||
-        p.slug.toLowerCase() === name.toLowerCase() ||
-        p.name.toLowerCase().includes(name.toLowerCase()) ||
-        p.slug.toLowerCase().includes(name.toLowerCase())
-    ) || null;
-  } catch { return null; }
-}
 
 async function fetchRelatedExploits(protocolName: string): Promise<Array<{ name: string; date: string; amount: number; technique: string }>> {
   try {

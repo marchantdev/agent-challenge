@@ -131,14 +131,16 @@ export async function computeSecurityScore(protocolName: string): Promise<Securi
   return computeSecurityScoreFromProtocol(data);
 }
 
-async function fetchProtocolData(name: string): Promise<any | null> {
+export async function fetchProtocolData(name: string): Promise<any | null> {
   try {
     const protocols = await cachedFetch(`${DEFILLAMA_API}/protocols`) as any[];
-    const match = protocols.find((p: any) =>
-      p.name.toLowerCase() === name.toLowerCase() ||
-      p.slug.toLowerCase() === name.toLowerCase()
-    );
-    return match || null;
+    const lower = name.toLowerCase();
+    // Exact match first, then fuzzy
+    return protocols.find((p: any) =>
+      p.name.toLowerCase() === lower || p.slug.toLowerCase() === lower
+    ) || protocols.find((p: any) =>
+      p.name.toLowerCase().includes(lower) || p.slug.toLowerCase().includes(lower)
+    ) || null;
   } catch { return null; }
 }
 

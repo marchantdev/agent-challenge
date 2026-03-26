@@ -8,7 +8,7 @@
 
 ## Demo
 
-> **Demo Video:** Coming soon — deployment in progress
+> **Demo Video:** [Axiom Demo](demo-video.mp4) — 60s walkthrough of all 5 views
 
 ### Screenshots
 
@@ -107,7 +107,7 @@ Axiom operates across **Ethereum** and **Solana** natively:
 
 ### Nosana Integration
 
-- **Deployed on Nosana GPU nodes** (NVIDIA RTX 3090)
+- **Configured for Nosana GPU inference** (Qwen3.5-27B-AWQ-4bit on NVIDIA RTX 3090)
 - **Nosana SDK** — Uses `@nosana/sdk` `Client` to query node and job counts directly from Solana on-chain data
 - **Health endpoints** — `/api/health` and `/api/metrics` serving real operational data
 - **Network awareness** — Agent reports NOS token price (CoinGecko), node count, and active jobs
