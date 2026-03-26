@@ -11,7 +11,7 @@ import { readFile, stat } from "node:fs/promises";
 import { join, extname, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { logger } from "@elizaos/core";
-import { computeSecurityScore } from "./actions/assessRisk.ts";
+import { computeSecurityScoreFromProtocol } from "./actions/assessRisk.ts";
 import { cachedFetch } from "./utils/api.ts";
 import { fetchRektExploits } from "./utils/rektFetch.ts";
 
@@ -130,7 +130,7 @@ async function handleSecurityScoreBadge(res: ServerResponse, protocol: string): 
     let score = 0;
     let label = "Unknown";
     if (match) {
-      const s = await computeSecurityScore(match);
+      const s = await computeSecurityScoreFromProtocol(match);
       score = s.total;
       label = `${score}/100`;
     }
@@ -186,7 +186,7 @@ async function handleSecurityScore(res: ServerResponse, protocol: string): Promi
       res.end(JSON.stringify({ error: `Protocol "${protocol}" not found on DefiLlama` }));
       return;
     }
-    const score = await computeSecurityScore(match);
+    const score = await computeSecurityScoreFromProtocol(match);
     res.writeHead(200, { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" });
     res.end(
       JSON.stringify({
