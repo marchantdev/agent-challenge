@@ -9,6 +9,7 @@
  */
 
 import { type Plugin } from "@elizaos/core";
+import { startFrontendServer } from "./server.ts";
 import { assessRiskAction } from "./actions/assessRisk.ts";
 import { explainVulnAction } from "./actions/explainVuln.ts";
 import { scanTvlAction } from "./actions/scanTvl.ts";
@@ -24,9 +25,17 @@ import { generateAuditReportAction } from "./actions/generateAuditReport.ts";
 import { defiMarketProvider } from "./providers/defiMarketProvider.ts";
 import { responseQualityEvaluator } from "./evaluators/responseQualityEvaluator.ts";
 
+let frontendStarted = false;
+
 export const axiomPlugin: Plugin = {
   name: "axiom-security-plugin",
   description: "DeFi Security Operations Center: protocol risk assessment, exploit tracking, contract inspection, TVL monitoring, wallet risk analysis, protocol watchlist monitoring, protocol comparison, full audit report generation, and Nosana infrastructure awareness.",
+  init: async () => {
+    if (!frontendStarted) {
+      frontendStarted = true;
+      startFrontendServer();
+    }
+  },
   actions: [
     assessRiskAction,
     explainVulnAction,

@@ -4,7 +4,7 @@
   "plugins": [
     "@elizaos/plugin-bootstrap",
     "@elizaos/plugin-openai",
-    "./dist/index.js"
+    "./dist/plugin.js"
   ],
   "clients": [],
   "modelProvider": "openai",
