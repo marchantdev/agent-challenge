@@ -1,26 +1,27 @@
 #!/bin/sh
 # Axiom startup script
-# Starts the frontend/API server FIRST (ensures port 8080 is up for health checks)
-# then starts the ElizaOS agent.
+# Server (port 8080) is the MAIN process — stays up even if elizaos crashes.
+# elizaos runs in the background; crashes are logged but don't kill the server.
 
-set -e
-
-# Ensure node_modules/.bin is in PATH (pnpm adds this automatically in npm scripts,
-# but not when running as a direct CMD entrypoint)
+# Ensure node_modules/.bin is in PATH
 export PATH="/app/node_modules/.bin:$PATH"
 
 echo "[start.sh] Starting Axiom frontend server on port ${FRONTEND_PORT:-8080}..."
 node /app/dist/server.js &
 SERVER_PID=$!
 
-# Brief pause to let the server bind
-sleep 2
+# Wait for server to bind
+sleep 3
 
-echo "[start.sh] Frontend server started (PID $SERVER_PID)"
-echo "[start.sh] Starting ElizaOS agent..."
+echo "[start.sh] Frontend server running (PID $SERVER_PID)"
+echo "[start.sh] Starting ElizaOS agent in background..."
 
-# Start elizaos (may take several minutes for LLM initialization)
-elizaos start --character /app/characters/agent.character.json
+# Start elizaos in background — errors don't crash the server
+elizaos start --character /app/characters/agent.character.json &
+ELIZAOS_PID=$!
 
-# If elizaos exits, also stop the server
-kill $SERVER_PID 2>/dev/null || true
+echo "[start.sh] ElizaOS started (PID $ELIZAOS_PID)"
+
+# Keep container alive by waiting on the server process
+# If server exits, the container exits. ElizaOS crash is non-fatal.
+wait $SERVER_PID
