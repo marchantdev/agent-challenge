@@ -50,13 +50,17 @@ RUN mkdir -p /app/data
 
 EXPOSE 3000 8080
 
-# Compile TypeScript plugin to dist/ so character can load ./dist/index.js
+# Compile TypeScript plugin + standalone server to dist/
 RUN pnpm build
 
-HEALTHCHECK --interval=30s --timeout=5s CMD curl -f http://localhost:8080/api/health || exit 1
+# Make startup script executable
+RUN chmod +x /app/start.sh
+
+HEALTHCHECK --interval=30s --timeout=10s --start-period=30s CMD curl -f http://localhost:8080/api/health || exit 1
 
 ENV NODE_ENV=production
 ENV SERVER_PORT=3000
 ENV FRONTEND_PORT=8080
 
-CMD ["pnpm", "start"]
+# Start server first (port 8080), then elizaos agent
+CMD ["/app/start.sh"]

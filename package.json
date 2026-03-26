@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "bun build src/plugin.ts --outdir dist --target node --external '@elizaos/core' --external '@elizaos/plugin-openai' --external '@elizaos/plugin-bootstrap' --external '@elizaos/plugin-anthropic'",
+    "build": "bun build src/plugin.ts --outdir dist --target node --external '@elizaos/core' --external '@elizaos/plugin-openai' --external '@elizaos/plugin-bootstrap' --external '@elizaos/plugin-anthropic' && bun build src/server.ts --outfile dist/server.js --target node --external '@elizaos/core'",
     "start": "elizaos start --character ./characters/agent.character.json",
     "dev": "elizaos dev --character ./characters/agent.character.json",
     "test": "vitest run"
