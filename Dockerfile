@@ -49,6 +49,10 @@ COPY --from=frontend-build /frontend/dist /app/frontend/dist
 RUN mkdir -p /app/data
 
 EXPOSE 3000 8080
+
+# Compile TypeScript plugin to dist/ so character can load ./dist/index.js
+RUN pnpm build
+
 HEALTHCHECK --interval=30s --timeout=5s CMD curl -f http://localhost:8080/api/health || exit 1
 
 ENV NODE_ENV=production
