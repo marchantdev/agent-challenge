@@ -30,19 +30,23 @@ import { formatUsd, cachedFetch } from "../utils/api.js";
 const DEFILLAMA_API = "https://api.llama.fi";
 const ETHERSCAN_API = "https://api.etherscan.io/v2/api";
 
-interface SecurityScore {
-  total: number;
-  tvlStability: number;
-  verification: number;
-  maturity: number;
-  exploitHistory: number;
-  label: "Low Risk" | "Moderate Risk" | "Elevated Risk" | "High Risk";
+export interface SecurityScore {
+  total: number;          // 0-100
+  tvlStability: number;   // 0-25
+  verification: number;   // 0-25
+  maturity: number;       // 0-25
+  exploitHistory: number; // 0-25
+  riskLabel: string;      // "Low Risk" | "Moderate Risk" | "Elevated Risk" | "High Risk"
+  label: string;          // alias for riskLabel (backward compat)
   emoji: string;
 }
 
-export async function computeSecurityScore(protocol: any): Promise<SecurityScore> {
+/**
+ * Compute security score from a full protocol object (used by ASSESS_PROTOCOL_RISK handler).
+ * Performs live Etherscan verification check and DefiLlama hacks cross-reference.
+ */
+export async function computeSecurityScoreFromProtocol(protocol: any): Promise<SecurityScore> {
   // --- Component 1: TVL Stability (0-25) ---
-  // Penalise large swings in 24h or 7d TVL
   const change1d = Math.abs(protocol.change_1d ?? 0);
   const change7d = Math.abs(protocol.change_7d ?? 0);
   let tvlStability: number;
@@ -52,11 +56,9 @@ export async function computeSecurityScore(protocol: any): Promise<SecurityScore
   else tvlStability = 25;
 
   // --- Component 2: Verification Status (0-25) ---
-  // Check if primary contract is source-verified on Etherscan
-  let verification = 10; // default: unknown / no address
+  let verification = 10;
   const rawAddress = protocol.address;
   if (rawAddress) {
-    // Address may be plain "0x..." or prefixed "ethereum:0x..."
     const addr = rawAddress.includes(":") ? rawAddress.split(":")[1] : rawAddress;
     if (addr && /^0x[0-9a-fA-F]{40}$/.test(addr)) {
       try {
@@ -73,7 +75,6 @@ export async function computeSecurityScore(protocol: any): Promise<SecurityScore
   }
 
   // --- Component 3: Protocol Maturity (0-25) ---
-  // Older protocols are better-battle-tested
   let maturity: number;
   const listedAt = protocol.listedAt as number | undefined;
   if (listedAt) {
@@ -84,11 +85,10 @@ export async function computeSecurityScore(protocol: any): Promise<SecurityScore
     else if (ageMonths >= 1) maturity = 8;
     else maturity = 5;
   } else {
-    maturity = 10; // unknown listing date
+    maturity = 10;
   }
 
   // --- Component 4: Exploit History (0-25) ---
-  // Cross-reference DefiLlama /hacks; penalise recent exploits more
   let exploitHistory = 25;
   try {
     const hacks = await cachedFetch(`${DEFILLAMA_API}/hacks`);
@@ -96,90 +96,39 @@ export async function computeSecurityScore(protocol: any): Promise<SecurityScore
       const nameLower = protocol.name.toLowerCase();
       const sixMonthsAgo = Date.now() - 6 * 30 * 24 * 60 * 60 * 1000;
       const twoYearsAgo = Date.now() - 2 * 365 * 24 * 60 * 60 * 1000;
-
       const related = hacks.filter((h: any) =>
         h.name?.toLowerCase().includes(nameLower) || nameLower.includes(h.name?.toLowerCase() ?? "___")
       );
-
       if (related.length > 0) {
-        // date field is Unix timestamp (seconds)
         const mostRecentMs = Math.max(...related.map((h: any) => (h.date as number) * 1000));
         if (mostRecentMs > sixMonthsAgo) exploitHistory = 0;
         else if (mostRecentMs > twoYearsAgo) exploitHistory = 8;
-        else exploitHistory = 15; // old exploit, partially discounted
+        else exploitHistory = 15;
       }
     }
   } catch { /* keep default */ }
 
   const total = tvlStability + verification + maturity + exploitHistory;
 
-  let label: SecurityScore["label"];
+  let riskLabel: string;
   let emoji: string;
-  if (total >= 80) { label = "Low Risk"; emoji = "🟢"; }
-  else if (total >= 60) { label = "Moderate Risk"; emoji = "🟡"; }
-  else if (total >= 40) { label = "Elevated Risk"; emoji = "🟠"; }
-  else { label = "High Risk"; emoji = "🔴"; }
+  if (total >= 80) { riskLabel = "Low Risk"; emoji = "🟢"; }
+  else if (total >= 60) { riskLabel = "Moderate Risk"; emoji = "🟡"; }
+  else if (total >= 40) { riskLabel = "Elevated Risk"; emoji = "🟠"; }
+  else { riskLabel = "High Risk"; emoji = "🔴"; }
 
-  return { total, tvlStability, verification, maturity, exploitHistory, label, emoji };
-}
-
-export interface SecurityScore {
-  total: number;          // 0-100
-  tvlStability: number;   // 0-25
-  verification: number;   // 0-25
-  maturity: number;       // 0-25
-  exploitHistory: number; // 0-25
-  riskLabel: string;      // "Low Risk" | "Moderate Risk" | "High Risk"
+  return { total, tvlStability, verification, maturity, exploitHistory, riskLabel, label: riskLabel, emoji };
 }
 
 /**
- * Compute a deterministic security score for a protocol using DefiLlama data.
+ * Compute a security score by protocol name (used by GENERATE_AUDIT_REPORT).
+ * Fetches data from DefiLlama, then delegates to computeSecurityScoreFromProtocol.
  * Returns null if the protocol isn't found.
  */
 export async function computeSecurityScore(protocolName: string): Promise<SecurityScore | null> {
   const data = await fetchProtocolData(protocolName);
   if (!data) return null;
-
-  const tvl = data.tvl || 0;
-  const change1d = data.change_1d ?? 0;
-  const chains = (data.chains || []).length;
-  const audits = data.audits || 0;
-
-  // TVL Stability (0-25): higher TVL + lower volatility = better
-  let tvlStability = 10;
-  if (tvl >= 1e9) tvlStability = 25;
-  else if (tvl >= 100e6) tvlStability = 20;
-  else if (tvl >= 10e6) tvlStability = 15;
-  else if (tvl >= 1e6) tvlStability = 10;
-  else tvlStability = 5;
-  if (Math.abs(change1d) > 10) tvlStability = Math.max(0, tvlStability - 5);
-
-  // Verification (0-25): audits + open source
-  let verification = 10;
-  if (audits >= 3) verification = 25;
-  else if (audits >= 2) verification = 20;
-  else if (audits >= 1) verification = 15;
-  else verification = 5;
-
-  // Maturity (0-25): chain count + category presence
-  let maturity = 10;
-  if (chains >= 5) maturity = 25;
-  else if (chains >= 3) maturity = 22;
-  else if (chains >= 2) maturity = 18;
-  else maturity = 12;
-  if (data.category) maturity = Math.min(25, maturity + 3);
-
-  // Exploit History (0-25): inferred from TVL stability and age
-  // Without a direct exploit DB lookup, use TVL drop as proxy
-  let exploitHistory = 20;
-  if (change1d < -20) exploitHistory = 5;
-  else if (change1d < -10) exploitHistory = 10;
-  else if (change1d < -5) exploitHistory = 15;
-
-  const total = tvlStability + verification + maturity + exploitHistory;
-  const riskLabel = total >= 75 ? "Low Risk" : total >= 50 ? "Moderate Risk" : "High Risk";
-
-  return { total, tvlStability, verification, maturity, exploitHistory, riskLabel };
+  return computeSecurityScoreFromProtocol(data);
 }
 
 async function fetchProtocolData(name: string): Promise<any | null> {
@@ -192,8 +141,6 @@ async function fetchProtocolData(name: string): Promise<any | null> {
     return match || null;
   } catch { return null; }
 }
-
-/* computeSecurityScore is already exported inline at its definition */
 
 function assessRiskLevel(tvl: number, change1d: number | null, audits: number, chains: number): string[] {
   const risks: string[] = [];
@@ -264,7 +211,7 @@ export const assessRiskAction: Action = {
     const risks = assessRiskLevel(tvl, change1d, audits, chains);
 
     // Compute Security Score from real API data (NOT LLM-generated)
-    const score = await computeSecurityScore(data);
+    const score = await computeSecurityScoreFromProtocol(data);
 
     // Generate AI-powered expert commentary via Nosana-hosted Qwen model
     const dataContext = `Protocol: ${data.name} | Category: ${category} | TVL: ${formatUsd(tvl)} | Security Score: ${score.total}/100 (${score.label}) | Chains: ${(data.chains || []).join(", ")} | 24h: ${change1d !== null ? change1d.toFixed(2) + "%" : "N/A"} | 7d: ${change7d !== null ? change7d.toFixed(2) + "%" : "N/A"} | Flags: ${risks.join("; ")}`;

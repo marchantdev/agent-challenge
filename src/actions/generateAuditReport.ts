@@ -6,10 +6,10 @@
  *   3. Exploit history from DeFiLlama Hacks API (filtered for this protocol)
  *   4. Contract verification from Etherscan (if address found in DefiLlama data)
  *   5. Active bounty check from Immunefi sitemap
- *   6. AI risk assessment and recommendations via generateText (Nosana-hosted model)
+ *   6. AI risk assessment and recommendations via runtime.useModel (Nosana-hosted model)
  */
 
-import { generateText, ModelClass } from "@elizaos/core";
+import { ModelType } from "@elizaos/core";
 import type { Action, IAgentRuntime, Memory, State, HandlerCallback, HandlerOptions } from "@elizaos/core";
 import { computeSecurityScore } from "./assessRisk.ts";
 import { checkContractVerification as checkVerificationV2 } from "../utils/ethRpc.ts";
@@ -167,9 +167,8 @@ export const generateAuditReportAction: Action = {
     let aiAssessment = "";
     let aiRecommendations = "";
     try {
-      const aiResponse = await generateText({
-        runtime,
-        context: `You are Axiom, an expert DeFi security analyst running on Nosana's decentralized GPU network. A user has requested a full security audit report for "${displayName}".
+      const aiResponse = await runtime.useModel(ModelType.TEXT_LARGE, {
+        prompt: `You are Axiom, an expert DeFi security analyst running on Nosana's decentralized GPU network. A user has requested a full security audit report for "${displayName}".
 
 Based on this aggregated data: ${dataContext}
 
@@ -185,8 +184,7 @@ RECOMMENDATIONS:
 - [recommendation 1]
 - [recommendation 2]
 - [recommendation 3]`,
-        modelClass: ModelClass.LARGE,
-      });
+      }) as string;
 
       // Parse AI response into two sections
       const assessmentMatch = aiResponse.match(/ASSESSMENT:\s*([\s\S]+?)(?=RECOMMENDATIONS:|$)/i);

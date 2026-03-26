@@ -5,7 +5,7 @@
  * then generates AI commentary via Nosana-hosted Qwen.
  */
 
-import { generateText, ModelClass } from "@elizaos/core";
+import { ModelType } from "@elizaos/core";
 import type { Action, IAgentRuntime, Memory, State, HandlerCallback, HandlerOptions } from "@elizaos/core";
 import { computeSecurityScore, type SecurityScore } from "./assessRisk.ts";
 
@@ -86,11 +86,9 @@ export const compareProtocolsAction: Action = {
     // AI commentary comparing the two
     let aiAnalysis = "";
     try {
-      aiAnalysis = await generateText({
-        runtime,
-        context: `You are Axiom, a DeFi security analyst running on Nosana's decentralised GPU network. Compare these two protocols based on their security scores:\n\n${nameA}: Total ${scoreA.total}/100 (TVL Stability ${scoreA.tvlStability}/25, Verification ${scoreA.verification}/25, Maturity ${scoreA.maturity}/25, Exploit History ${scoreA.exploitHistory}/25) — ${scoreA.riskLabel}\n${nameB}: Total ${scoreB.total}/100 (TVL Stability ${scoreB.tvlStability}/25, Verification ${scoreB.verification}/25, Maturity ${scoreB.maturity}/25, Exploit History ${scoreB.exploitHistory}/25) — ${scoreB.riskLabel}\n\nProvide a 3-4 sentence comparative analysis. Highlight the key differences, which protocol is stronger in which areas, and any actionable insights for a DeFi user choosing between them. Be specific, not generic.`,
-        modelClass: ModelClass.LARGE,
-      });
+      aiAnalysis = await runtime.useModel(ModelType.TEXT_LARGE, {
+        prompt: `You are Axiom, a DeFi security analyst running on Nosana's decentralised GPU network. Compare these two protocols based on their security scores:\n\n${nameA}: Total ${scoreA.total}/100 (TVL Stability ${scoreA.tvlStability}/25, Verification ${scoreA.verification}/25, Maturity ${scoreA.maturity}/25, Exploit History ${scoreA.exploitHistory}/25) — ${scoreA.riskLabel}\n${nameB}: Total ${scoreB.total}/100 (TVL Stability ${scoreB.tvlStability}/25, Verification ${scoreB.verification}/25, Maturity ${scoreB.maturity}/25, Exploit History ${scoreB.exploitHistory}/25) — ${scoreB.riskLabel}\n\nProvide a 3-4 sentence comparative analysis. Highlight the key differences, which protocol is stronger in which areas, and any actionable insights for a DeFi user choosing between them. Be specific, not generic.`,
+      }) as string;
     } catch { /* LLM unavailable — table stands alone */ }
 
     const output = [
