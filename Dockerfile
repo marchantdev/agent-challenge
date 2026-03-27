@@ -1,5 +1,3 @@
-# syntax=docker/dockerfile:1
-
 # Stage 1: Build frontend
 FROM node:23-slim AS frontend-build
 WORKDIR /frontend
