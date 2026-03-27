@@ -83,7 +83,7 @@ ACTIONS_TO_TEST = [
     ("GENERATE_AUDIT_REPORT (AI)", "Generate audit report for Uniswap", "audit"),  # generateAuditReportAction
     ("NOSANA_STATUS", "Where do you run?", "nosana"),                         # nosanaStatusAction
     ("SCAN_BOUNTIES", "Show me active bug bounty programs", "bounty"),        # scanBountiesAction
-    ("AUDIT_RECON", "Run audit recon on aave", "audit"),                      # auditReconAction
+    ("AUDIT_RECON", "Recon github.com/aave/aave-v3-core", "commit"),           # auditReconAction
 ]
 
 def setup_channel():
