@@ -106,10 +106,16 @@ export const nosanaStatusAction: Action = {
   similes: ["NOSANA", "INFRASTRUCTURE", "DEPLOYMENT", "GPU_STATUS", "WHERE_DO_YOU_RUN", "NETWORK_STATUS", "NOS_PRICE", "NOSANA_HEALTH"],
   validate: async (_runtime: IAgentRuntime, message: Memory) => {
     const text = (message.content?.text || "").toLowerCase();
-    return text.includes("nosana") || text.includes("infrastructure") || text.includes("where") ||
-           text.includes("gpu") || text.includes("deployment") || text.includes("network") ||
-           text.includes("nos") || text.includes("run") || text.includes("health") ||
-           text.includes("uptime") || text.includes("status");
+    return (
+      text.includes("nosana") ||
+      text.includes("infrastructure") ||
+      text.includes("where do you run") ||
+      text.includes("gpu") ||
+      text.includes("deployment") ||
+      text.includes("uptime") ||
+      text.includes("which node") ||
+      text.includes("what node")
+    );
   },
   handler: async (_runtime: IAgentRuntime, _message: Memory, _state?: State, _options?: HandlerOptions, callback?: HandlerCallback) => {
     // Runtime telemetry

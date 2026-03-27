@@ -109,7 +109,12 @@ export default function Chat() {
     setInput("");
     setLoading(true);
 
-    const response = await sendMessage("default", msg);
+    let response: string;
+    try {
+      response = await sendMessage("default", msg);
+    } catch {
+      response = "⚠️ Axiom is unavailable — agent may still be starting. Try again in a moment.";
+    }
     const agentMsg: ChatMessage = { id: `a-${Date.now()}`, role: "agent", text: response, timestamp: Date.now() };
     setMessages((m) => [...m, agentMsg]);
     setLoading(false);
