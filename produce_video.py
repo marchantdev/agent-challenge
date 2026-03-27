@@ -58,7 +58,7 @@ KOKORO_MODEL = Path("/opt/autonomous-ai/models/kokoro/kokoro-v1.0.int8.onnx")
 KOKORO_VOICES = Path("/opt/autonomous-ai/models/kokoro/voices-v1.0.bin")
 
 
-def generate_voiceover():
+def generate_voiceover(use_gtts=False):
     """Generate professional voiceover: Kokoro (primary), ElevenLabs (secondary), gTTS (fallback)."""
     vo_path = ASSETS_DIR / "voiceover.mp3"
     if vo_path.exists():
@@ -185,33 +185,83 @@ def create_closing_card():
     return card_path
 
 
-def screenshot_views(live_url: str):
-    """Screenshot all 5 views using Playwright."""
+def capture_views(live_url: str):
+    """Capture all 5 views: screen recording for chat (streaming), screenshots for others."""
     import asyncio
     from playwright.async_api import async_playwright
 
-    screenshots = {}
+    captures = {}  # view_id -> {"type": "image"|"video", "path": Path}
+
+    async def record_chat(p, live_url):
+        """Record chat view as video to capture streaming response."""
+        video_path = ASSETS_DIR / "view_chat.webm"
+        if video_path.exists():
+            log(f"Chat recording already exists: {video_path}")
+            captures["chat"] = {"type": "video", "path": video_path}
+            return
+
+        log("Recording chat view (screen capture)...")
+        browser = await p.chromium.launch(headless=True)
+        ctx = await browser.new_context(
+            viewport={"width": 1920, "height": 1080},
+            record_video_dir=str(ASSETS_DIR),
+            record_video_size={"width": 1920, "height": 1080},
+        )
+        page = await ctx.new_page()
+        try:
+            url = f"{live_url.rstrip('/')}?view=chat"
+            await page.goto(url, wait_until="networkidle", timeout=30000)
+            await page.wait_for_timeout(1500)
+
+            # Send a message and wait for streaming response
+            inp = page.locator('input[placeholder*="message"], textarea').first
+            await inp.fill("What is the security score for Aave?")
+            await page.wait_for_timeout(500)
+            await inp.press("Enter")
+            await page.wait_for_timeout(8000)  # Wait for streaming to complete
+        except Exception as e:
+            log(f"Chat recording interaction failed: {e}")
+
+        # Close page to flush the video
+        raw_video = await page.video.path()
+        await page.close()
+        await ctx.close()
+        await browser.close()
+
+        # Rename video file
+        if raw_video and Path(raw_video).exists():
+            Path(raw_video).rename(video_path)
+            captures["chat"] = {"type": "video", "path": video_path}
+            log(f"  Chat recording saved: {video_path}")
+        else:
+            log("  WARN: Chat video not captured, falling back to screenshot")
 
     async def take_shots():
         async with async_playwright() as p:
+            # Record chat view first (separate browser for video)
+            await record_chat(p, live_url)
+
+            # Screenshot the other 4 views
             browser = await p.chromium.launch(headless=True)
             ctx = await browser.new_context(viewport={"width": 1920, "height": 1080})
             page = await ctx.new_page()
 
             for view_id, view_label in VIEWS:
+                if view_id == "chat" and "chat" in captures:
+                    continue  # Already recorded as video
+
                 shot_path = ASSETS_DIR / f"view_{view_id}.png"
                 if shot_path.exists():
                     log(f"Screenshot already exists: {shot_path}")
-                    screenshots[view_id] = shot_path
+                    captures[view_id] = {"type": "image", "path": shot_path}
                     continue
 
                 url = f"{live_url.rstrip('/')}?view={view_id}" if view_id != "dashboard" else live_url
                 log(f"Screenshotting {view_label} at {url}...")
                 try:
                     await page.goto(url, wait_until="networkidle", timeout=30000)
-                    await page.wait_for_timeout(2500)  # Let data load
+                    await page.wait_for_timeout(2500)
 
-                    # For scanner view, type a query to show live data
                     if view_id == "scanner":
                         try:
                             inp = page.locator('input[placeholder*="protocol"], input[placeholder*="address"], input[type="text"]').first
@@ -221,18 +271,8 @@ def screenshot_views(live_url: str):
                         except Exception:
                             pass
 
-                    # For chat view, send a message
-                    if view_id == "chat":
-                        try:
-                            inp = page.locator('input[placeholder*="message"], textarea').first
-                            await inp.fill("What is the security score for Aave?")
-                            await inp.press("Enter")
-                            await page.wait_for_timeout(4000)
-                        except Exception:
-                            pass
-
                     await page.screenshot(path=str(shot_path), full_page=False)
-                    screenshots[view_id] = shot_path
+                    captures[view_id] = {"type": "image", "path": shot_path}
                     log(f"  Saved: {shot_path}")
                 except Exception as e:
                     log(f"  WARN: Failed to screenshot {view_id}: {e}")
@@ -240,11 +280,11 @@ def screenshot_views(live_url: str):
             await browser.close()
 
     asyncio.run(take_shots())
-    return screenshots
+    return captures
 
 
-def compose_video(voiceover_path: Path, screenshots: dict):
-    """Compose final video from voiceover + screenshots + cards."""
+def compose_video(voiceover_path: Path, captures: dict):
+    """Compose final video from voiceover + captures (images/videos) + cards."""
     log("Composing video...")
 
     title_path = create_title_card()
@@ -267,12 +307,25 @@ def compose_video(voiceover_path: Path, screenshots: dict):
     title_clip = ImageClip(str(title_path)).with_duration(title_duration).with_fps(24)
     clips.append(title_clip)
 
-    # View screenshots (equal duration each)
+    # View clips (mix of screenshots and screen recordings)
     for view_id, _ in VIEWS:
-        if view_id in screenshots:
-            shot_path = screenshots[view_id]
-            clip = ImageClip(str(shot_path)).with_duration(view_duration).with_fps(24)
-            clips.append(clip)
+        if view_id in captures:
+            cap = captures[view_id]
+            if cap["type"] == "video":
+                # Screen recording (e.g., chat with streaming)
+                vclip = VideoFileClip(str(cap["path"]))
+                # Trim to fit allocated duration, take the middle portion
+                if vclip.duration > view_duration:
+                    start = max(0, (vclip.duration - view_duration) / 2)
+                    vclip = vclip.subclipped(start, start + view_duration)
+                else:
+                    vclip = vclip.with_duration(min(vclip.duration, view_duration))
+                vclip = vclip.resized((1920, 1080)).without_audio()
+                clips.append(vclip)
+            else:
+                # Static screenshot
+                clip = ImageClip(str(cap["path"])).with_duration(view_duration).with_fps(24)
+                clips.append(clip)
         else:
             # Fallback: black frame with label
             img = Image.new("RGB", (1920, 1080), (20, 25, 40))
@@ -291,7 +344,7 @@ def compose_video(voiceover_path: Path, screenshots: dict):
     closing_clip = ImageClip(str(closing_path)).with_duration(closing_duration).with_fps(24)
     clips.append(closing_clip)
 
-    # Concatenate (moviepy 2.x API)
+    # Concatenate with crossfade transitions (moviepy 2.x API)
     video = concatenate_videoclips(clips, method="compose")
     video = video.with_audio(audio)
 
@@ -357,10 +410,10 @@ def main():
         log(f"Voiceover-only mode. Audio at: {vo_path}")
         return
 
-    # Step 2: Screenshot all views
-    screenshots = screenshot_views(live_url)
-    if not screenshots:
-        log("ERROR: No screenshots captured. Check the live URL.")
+    # Step 2: Capture all views (screenshots + screen recording for chat)
+    captures = capture_views(live_url)
+    if not captures:
+        log("ERROR: No views captured. Check the live URL.")
         sys.exit(1)
 
     # Step 3: Create static cards
@@ -368,7 +421,7 @@ def main():
     create_closing_card()
 
     # Step 4: Compose final video
-    video_path = compose_video(vo_path, screenshots)
+    video_path = compose_video(vo_path, captures)
 
     # Step 5: Upload to YouTube
     yt_url = upload_to_youtube(video_path)
