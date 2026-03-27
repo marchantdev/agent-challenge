@@ -54,22 +54,49 @@ def ensure_assets_dir():
     ASSETS_DIR.mkdir(exist_ok=True)
 
 
-def generate_voiceover(use_gtts: bool = False):
-    """Generate professional voiceover via ElevenLabs API, with gTTS fallback."""
+KOKORO_MODEL = Path("/opt/autonomous-ai/models/kokoro/kokoro-v1.0.int8.onnx")
+KOKORO_VOICES = Path("/opt/autonomous-ai/models/kokoro/voices-v1.0.bin")
+
+
+def generate_voiceover():
+    """Generate professional voiceover: Kokoro (primary), ElevenLabs (secondary), gTTS (fallback)."""
     vo_path = ASSETS_DIR / "voiceover.mp3"
     if vo_path.exists():
         log(f"Voiceover already exists: {vo_path}")
         return vo_path
 
-    if not use_gtts:
+    # Primary: Kokoro TTS (local, #1 TTS Arena, no credits needed)
+    if KOKORO_MODEL.exists() and KOKORO_VOICES.exists():
+        try:
+            from kokoro_onnx import Kokoro
+            import soundfile as sf
+            import numpy as np
+
+            log("Generating voiceover via Kokoro (#1 TTS Arena)...")
+            kokoro = Kokoro(str(KOKORO_MODEL), str(KOKORO_VOICES))
+            wav_path = ASSETS_DIR / "voiceover.wav"
+            samples, sr = kokoro.create(NARRATION.strip(), voice="af_bella", speed=1.0, lang="en-us")
+            sf.write(str(wav_path), samples, sr)
+            # Convert WAV → MP3
+            import subprocess
+            subprocess.run(["ffmpeg", "-y", "-i", str(wav_path), "-ab", "192k", str(vo_path)],
+                           capture_output=True, check=True)
+            wav_path.unlink(missing_ok=True)
+            log(f"Kokoro voiceover saved: {vo_path}")
+            return vo_path
+        except Exception as e:
+            log(f"Kokoro failed: {e} — trying ElevenLabs...")
+
+    # Secondary: ElevenLabs
+    try:
         log("Generating voiceover via ElevenLabs...")
         r = requests.post(
             f"https://api.elevenlabs.io/v1/text-to-speech/{VOICE_ID}",
             headers={"xi-api-key": ELEVENLABS_KEY, "Content-Type": "application/json"},
             json={
                 "text": NARRATION.strip(),
-                "model_id": "eleven_multilingual_v2",
-                "voice_settings": {"stability": 0.45, "similarity_boost": 0.80, "style": 0.1},
+                "model_id": "eleven_turbo_v2_5",
+                "voice_settings": {"stability": 0.45, "similarity_boost": 0.80},
             },
             timeout=60,
         )
@@ -80,18 +107,19 @@ def generate_voiceover(use_gtts: bool = False):
             return vo_path
         else:
             log(f"ElevenLabs failed ({r.status_code}): {r.text[:200]}")
-            log("Falling back to gTTS...")
+    except Exception as e:
+        log(f"ElevenLabs error: {e}")
 
-    # gTTS fallback
+    # Last resort: gTTS
     try:
         from gtts import gTTS
-        log("Generating voiceover via gTTS (British accent)...")
+        log("Generating voiceover via gTTS (fallback)...")
         tts = gTTS(text=NARRATION.strip(), lang="en", slow=False, tld="co.uk")
         tts.save(str(vo_path))
         log(f"gTTS voiceover saved: {vo_path}")
         return vo_path
     except Exception as e:
-        raise RuntimeError(f"Both ElevenLabs and gTTS failed. Last error: {e}")
+        raise RuntimeError(f"All TTS methods failed. Last error: {e}")
 
 
 def create_title_card():
