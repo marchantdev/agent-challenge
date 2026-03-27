@@ -223,7 +223,7 @@ async function getOrCreateChannel(agentId: string): Promise<{ channelId: string;
   const serversRes = await fetch(`${AGENT_BASE}/messaging/message-servers`, { signal: AbortSignal.timeout(5000) });
   if (!serversRes.ok) throw new Error(`/api/messaging/message-servers returned ${serversRes.status}`);
   const serversData = await serversRes.json();
-  const servers: any[] = serversData.messageServers ?? serversData.data ?? serversData ?? [];
+  const servers: any[] = serversData.data?.messageServers ?? serversData.messageServers ?? (Array.isArray(serversData.data) ? serversData.data : []);
   if (servers.length === 0) throw new Error("No message servers");
   const serverId = servers[0].id;
 
@@ -287,7 +287,7 @@ export async function sendMessage(_agentId: string, text: string): Promise<strin
         });
         if (!pollRes.ok) continue;
         const pollData = await pollRes.json();
-        const messages: any[] = pollData.messages ?? pollData.data ?? [];
+        const messages: any[] = pollData.data?.messages ?? pollData.messages ?? (Array.isArray(pollData.data) ? pollData.data : []);
         const agentMsgs = messages.filter(
           (m: any) => m.authorId === agentId && new Date(m.createdAt).getTime() > startTime
         );
