@@ -21,7 +21,9 @@ echo "[start.sh] Frontend server running (PID $SERVER_PID)"
 # We intercept on localhost:4001 and translate.
 if [ -n "$OPENAI_BASE_URL" ]; then
   echo "[start.sh] Starting LLM proxy (/v1/responses → chat/completions)..."
-  export NOSANA_INFERENCE_URL="$OPENAI_BASE_URL"
+  # Strip trailing /v1 or /v1/ so proxy can append /v1/chat/completions cleanly
+  NOSANA_BASE=$(echo "$OPENAI_BASE_URL" | sed 's|/v1/*$||')
+  export NOSANA_INFERENCE_URL="$NOSANA_BASE"
   export OPENAI_BASE_URL="http://localhost:4001"
   export LLM_PROXY_PORT="4001"
   node /app/dist/llm-proxy.js &
