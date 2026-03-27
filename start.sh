@@ -14,6 +14,24 @@ SERVER_PID=$!
 sleep 3
 
 echo "[start.sh] Frontend server running (PID $SERVER_PID)"
+
+# ── LLM Proxy (chat/completions → /v1/responses adapter) ─────────────────────
+# The Nosana Qwen model uses the /v1/responses API, not /v1/chat/completions.
+# We intercept ElizaOS's OpenAI calls on localhost:4001 and translate them.
+if [ -n "$OPENAI_API_URL" ]; then
+  echo "[start.sh] Starting LLM proxy (chat/completions → /v1/responses)..."
+  export NOSANA_INFERENCE_URL="$OPENAI_API_URL"
+  export OPENAI_API_URL="http://localhost:4001"
+  export LLM_PROXY_PORT="4001"
+  node /app/dist/llm-proxy.js &
+  LLM_PROXY_PID=$!
+  sleep 1
+  echo "[start.sh] LLM proxy running (PID $LLM_PROXY_PID) → $NOSANA_INFERENCE_URL"
+else
+  echo "[start.sh] OPENAI_API_URL not set — skipping LLM proxy (no inference endpoint)"
+fi
+
+# ── ElizaOS Agent ─────────────────────────────────────────────────────────────
 echo "[start.sh] Starting ElizaOS agent in background..."
 
 # Start elizaos in background, tee output to log file for /api/logs endpoint
