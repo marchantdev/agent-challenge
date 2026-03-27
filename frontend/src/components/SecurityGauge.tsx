@@ -7,11 +7,11 @@ interface GaugeProps {
   size?: number;
 }
 
-function getRiskLevel(score: number): { label: string; color: string; arcColor: string } {
-  if (score >= 8) return { label: "Low Risk", color: "text-emerald-400", arcColor: "#34d399" };
-  if (score >= 6) return { label: "Medium Risk", color: "text-amber-400", arcColor: "#fbbf24" };
-  if (score >= 4) return { label: "High Risk", color: "text-orange-400", arcColor: "#fb923c" };
-  return { label: "Critical Risk", color: "text-red-400", arcColor: "#f87171" };
+function getRiskLevel(score: number): { label: string; color: string; arcColor: string; arcColorFaint: string } {
+  if (score >= 8) return { label: "Low Risk", color: "text-emerald-400", arcColor: "#34d399", arcColorFaint: "#34d39920" };
+  if (score >= 6) return { label: "Medium Risk", color: "text-amber-400", arcColor: "#fbbf24", arcColorFaint: "#fbbf2420" };
+  if (score >= 4) return { label: "High Risk", color: "text-orange-400", arcColor: "#fb923c", arcColorFaint: "#fb923c20" };
+  return { label: "Critical Risk", color: "text-red-400", arcColor: "#f87171", arcColorFaint: "#f8717120" };
 }
 
 function useAnimatedValue(target: number, duration = 800): number {
@@ -40,14 +40,23 @@ function useAnimatedValue(target: number, duration = 800): number {
   return val;
 }
 
-export default function SecurityGauge({ score, label, components, size = 160 }: GaugeProps) {
+// Stable ID derived from label (or random fallback)
+let idCounter = 0;
+function useStableId(prefix: string): string {
+  const ref = useRef<string | null>(null);
+  if (!ref.current) ref.current = `${prefix}-${++idCounter}`;
+  return ref.current;
+}
+
+export default function SecurityGauge({ score, label, components, size = 200 }: GaugeProps) {
   const animated = useAnimatedValue(score);
-  const { label: riskLabel, color, arcColor } = getRiskLevel(score);
+  const { label: riskLabel, color, arcColor, arcColorFaint } = getRiskLevel(score);
+  const gradId = useStableId("arcGrad");
 
   const cx = size / 2;
   const cy = size / 2 + 10;
-  const r = size / 2 - 16;
-  const strokeWidth = 10;
+  const r = size / 2 - 18;
+  const strokeWidth = 12;
 
   // Semicircle arc (180 degrees, from left to right)
   const startAngle = Math.PI; // left
@@ -60,22 +69,41 @@ export default function SecurityGauge({ score, label, components, size = 160 }: 
   const valAngle = startAngle + (endAngle - startAngle) * fraction;
   const valPath = fraction > 0.01 ? describeArc(cx, cy, r, startAngle, valAngle) : "";
 
+  // Gradient spans from left end to right end of the arc
+  const gradX1 = cx - r;
+  const gradX2 = cx + r;
+
   return (
     <div className="flex flex-col items-center">
-      <svg width={size} height={size / 2 + 24} viewBox={`0 0 ${size} ${size / 2 + 24}`}>
+      <svg width={size} height={size / 2 + 28} viewBox={`0 0 ${size} ${size / 2 + 28}`}>
+        <defs>
+          <linearGradient id={gradId} x1={gradX1} y1={0} x2={gradX2} y2={0} gradientUnits="userSpaceOnUse">
+            <stop offset="0%" stopColor={arcColorFaint} />
+            <stop offset="60%" stopColor={arcColor} stopOpacity={0.7} />
+            <stop offset="100%" stopColor={arcColor} />
+          </linearGradient>
+        </defs>
+
         {/* Background arc */}
         <path d={bgPath} fill="none" stroke="#27272a" strokeWidth={strokeWidth} strokeLinecap="round" />
-        {/* Value arc */}
+
+        {/* Value arc — gradient stroke */}
         {valPath && (
-          <path d={valPath} fill="none" stroke={arcColor} strokeWidth={strokeWidth} strokeLinecap="round"
-            style={{ filter: `drop-shadow(0 0 6px ${arcColor}40)` }}
+          <path
+            d={valPath}
+            fill="none"
+            stroke={`url(#${gradId})`}
+            strokeWidth={strokeWidth}
+            strokeLinecap="round"
+            style={{ filter: `drop-shadow(0 0 8px ${arcColor}50)` }}
           />
         )}
+
         {/* Score text */}
-        <text x={cx} y={cy - 8} textAnchor="middle" className="fill-zinc-100 text-2xl font-bold font-mono" fontSize="28">
+        <text x={cx} y={cy - 8} textAnchor="middle" className="fill-zinc-100 font-bold font-mono" fontSize="30">
           {animated.toFixed(1)}
         </text>
-        <text x={cx} y={cy + 12} textAnchor="middle" className="fill-zinc-500 text-xs" fontSize="11">
+        <text x={cx} y={cy + 14} textAnchor="middle" className="fill-zinc-500 text-xs" fontSize="12">
           / 10
         </text>
       </svg>
@@ -146,4 +174,28 @@ export function parseSecurityScore(text: string): { score: number; components: {
   }
 
   return { score, components };
+}
+
+// Helper: parse two security scores from a COMPARE_PROTOCOLS response
+export function parseCompareScores(text: string): {
+  nameA: string; scoreA: number;
+  nameB: string; scoreB: number;
+} | null {
+  // Match "### Protocol Comparison: A vs B"
+  const titleMatch = text.match(/Protocol Comparison:\s*(.+?)\s+vs\s+(.+?)(?:\n|$)/m);
+  if (!titleMatch) return null;
+
+  const nameA = titleMatch[1].trim();
+  const nameB = titleMatch[2].trim();
+
+  // Match "| Security Score | 75/100 | 68/100 |"
+  const scoreMatch = text.match(/\|\s*Security Score\s*\|\s*(\d+)\/100\s*\|\s*(\d+)\/100\s*\|/);
+  if (!scoreMatch) return null;
+
+  return {
+    nameA,
+    scoreA: parseInt(scoreMatch[1]) / 10, // convert to 0-10 scale for SecurityGauge
+    nameB,
+    scoreB: parseInt(scoreMatch[2]) / 10,
+  };
 }

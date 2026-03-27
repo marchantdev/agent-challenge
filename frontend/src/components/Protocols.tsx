@@ -35,6 +35,7 @@ type SortKey = "tvl" | "change_1d" | "change_7d" | "name";
 export default function Protocols({ onNavigate }: { onNavigate?: (v: View) => void }) {
   const [protocols, setProtocols] = useState<Protocol[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState("All");
   const [chain, setChain] = useState("All");
@@ -44,8 +45,8 @@ export default function Protocols({ onNavigate }: { onNavigate?: (v: View) => vo
 
   useEffect(() => {
     fetchProtocols()
-      .then(setProtocols)
-      .catch(() => setProtocols([]))
+      .then((data) => { setProtocols(data); setError(null); })
+      .catch(() => { setProtocols([]); setError("Failed to load protocol data from DefiLlama."); })
       .finally(() => setLoading(false));
   }, []);
 
@@ -148,8 +149,47 @@ export default function Protocols({ onNavigate }: { onNavigate?: (v: View) => vo
       )}
 
       {/* Table */}
+      {error && (
+        <div className="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-red-950/30 border border-red-800/40 text-sm text-red-400 mb-2">
+          <svg className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m0 3.75h.008v.008H12v-.008zm9-3.75a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+          {error}
+        </div>
+      )}
       {loading ? (
-        <div className="card text-center py-12 text-zinc-500">Loading protocol data...</div>
+        <div className="card p-0 overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-zinc-800 text-zinc-500 text-xs uppercase">
+                  <th className="text-left px-4 py-3 w-8">#</th>
+                  <th className="px-2 py-3 w-8" />
+                  <th className="text-left px-4 py-3">Name</th>
+                  <th className="text-left px-4 py-3">Category</th>
+                  <th className="text-left px-4 py-3">Chains</th>
+                  <th className="text-right px-4 py-3">TVL</th>
+                  <th className="text-right px-4 py-3">24h</th>
+                  <th className="text-right px-4 py-3">7d</th>
+                </tr>
+              </thead>
+              <tbody>
+                {Array.from({ length: 8 }).map((_, i) => (
+                  <tr key={i} className="border-b border-zinc-800/50">
+                    <td className="px-4 py-3"><div className="h-3 w-4 bg-zinc-800 animate-pulse rounded" /></td>
+                    <td className="px-2 py-3"><div className="h-2 w-2 bg-zinc-800 animate-pulse rounded-full" /></td>
+                    <td className="px-4 py-3"><div className="h-3 bg-zinc-800 animate-pulse rounded" style={{ width: `${60 + (i * 23) % 80}px` }} /></td>
+                    <td className="px-4 py-3"><div className="h-3 w-16 bg-zinc-800 animate-pulse rounded" /></td>
+                    <td className="px-4 py-3"><div className="h-4 w-20 bg-zinc-800 animate-pulse rounded-full" /></td>
+                    <td className="px-4 py-3 text-right"><div className="h-3 w-14 bg-zinc-800 animate-pulse rounded ml-auto" /></td>
+                    <td className="px-4 py-3 text-right"><div className="h-3 w-10 bg-zinc-800 animate-pulse rounded ml-auto" /></td>
+                    <td className="px-4 py-3 text-right"><div className="h-3 w-10 bg-zinc-800 animate-pulse rounded ml-auto" /></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
       ) : (
         <div className="card p-0 overflow-hidden">
           <div className="overflow-x-auto">

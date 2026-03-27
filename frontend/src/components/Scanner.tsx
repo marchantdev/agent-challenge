@@ -144,6 +144,23 @@ export default function Scanner() {
         </div>
       </div>
 
+      {/* Scanning skeleton */}
+      {loading && (
+        <div className="card space-y-3">
+          <div className="flex items-center gap-2 border-b border-zinc-800 pb-3">
+            <div className="w-5 h-5 rounded bg-zinc-800 animate-pulse" />
+            <div className="h-3 w-12 bg-zinc-800 animate-pulse rounded" />
+            <div className="h-3 w-40 bg-zinc-800 animate-pulse rounded" />
+          </div>
+          <div className="space-y-2">
+            {Array.from({ length: 5 }).map((_, i) => (
+              <div key={i} className="h-3 bg-zinc-800 animate-pulse rounded" style={{ width: `${70 + (i * 17) % 30}%` }} />
+            ))}
+          </div>
+          <div className="h-3 w-32 bg-zinc-800 animate-pulse rounded" />
+        </div>
+      )}
+
       {/* Results */}
       {results.length > 0 && (
         <div className="space-y-4">

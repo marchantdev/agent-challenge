@@ -220,3 +220,189 @@ describe("Formatting utilities", () => {
     expect(extractProtocolName("Is Uniswap safe?")).toBe("Uniswap");
   });
 });
+
+// ─── Handler-level tests ─────────────────────────────────────────────────────
+// These tests mock global fetch and verify that handlers return correctly
+// structured markdown output with expected sections and data.
+
+import { vi, beforeEach, afterEach } from "vitest";
+
+const MOCK_PROTOCOLS = [
+  {
+    name: "Aave V3",
+    slug: "aave-v3",
+    tvl: 20_000_000_000,
+    change_1d: 0.5,
+    change_7d: 1.2,
+    chains: ["Ethereum", "Polygon", "Arbitrum"],
+    category: "Lending",
+    listedAt: 1_600_000_000,
+    audits: "3",
+    address: "0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2",
+  },
+  {
+    name: "Compound",
+    slug: "compound",
+    tvl: 3_000_000_000,
+    change_1d: -1.1,
+    change_7d: -2.5,
+    chains: ["Ethereum"],
+    category: "Lending",
+    listedAt: 1_550_000_000,
+    audits: "5",
+    address: "0x3d9819210A31b4961b30EF54bE2aeD79B9c9Cd3B",
+  },
+];
+
+const MOCK_HACKS: unknown[] = [];
+
+function makeMockFetch() {
+  return vi.fn().mockImplementation(async (url: string) => {
+    const u = String(url);
+    if (u.includes("/protocols")) {
+      return { ok: true, json: async () => MOCK_PROTOCOLS } as Response;
+    }
+    if (u.includes("/hacks")) {
+      return { ok: true, json: async () => MOCK_HACKS } as Response;
+    }
+    if (u.includes("etherscan")) {
+      return {
+        ok: true,
+        json: async () => ({ status: "1", result: [{ SourceCode: "// src" }] }),
+      } as Response;
+    }
+    return { ok: false, status: 404, json: async () => ({}) } as Response;
+  });
+}
+
+describe("Action handlers — mock fetch + markdown verification", () => {
+  let savedFetch: typeof fetch;
+
+  const mockRuntime = {
+    useModel: vi.fn().mockResolvedValue(
+      "AI analysis: Protocol shows moderate risk based on current metrics."
+    ),
+  } as any;
+
+  beforeEach(() => {
+    savedFetch = global.fetch;
+    (global as any).fetch = makeMockFetch();
+  });
+
+  afterEach(() => {
+    (global as any).fetch = savedFetch;
+    vi.clearAllMocks();
+  });
+
+  it("ASSESS_PROTOCOL_RISK handler returns markdown with ## Risk Assessment header", async () => {
+    const calls: { text: string }[] = [];
+    const cb = async (r: { text: string }) => { calls.push(r); };
+
+    await assessRiskAction.handler!(mockRuntime, makeMemory("risk Compound"), undefined, {}, cb);
+
+    const final = calls[calls.length - 1]?.text ?? "";
+    expect(final).toMatch(/## Risk Assessment/);
+  });
+
+  it("ASSESS_PROTOCOL_RISK handler markdown contains Security Score /100", async () => {
+    const calls: { text: string }[] = [];
+    await assessRiskAction.handler!(
+      mockRuntime, makeMemory("risk Compound"), undefined, {}, async (r) => calls.push(r)
+    );
+    const final = calls[calls.length - 1]?.text ?? "";
+    expect(final).toMatch(/Security Score.*\/100/);
+  });
+
+  it("ASSESS_PROTOCOL_RISK handler markdown includes component table rows", async () => {
+    const calls: { text: string }[] = [];
+    await assessRiskAction.handler!(
+      mockRuntime, makeMemory("risk Compound"), undefined, {}, async (r) => calls.push(r)
+    );
+    const final = calls[calls.length - 1]?.text ?? "";
+    expect(final).toMatch(/TVL Stability/);
+    expect(final).toMatch(/Protocol Maturity/);
+    expect(final).toMatch(/Exploit History/);
+  });
+
+  it("ASSESS_PROTOCOL_RISK handler score is in 0-100 range", async () => {
+    const calls: { text: string }[] = [];
+    await assessRiskAction.handler!(
+      mockRuntime, makeMemory("risk Compound"), undefined, {}, async (r) => calls.push(r)
+    );
+    const final = calls[calls.length - 1]?.text ?? "";
+    const m = final.match(/(\d+)\/100/);
+    expect(m).not.toBeNull();
+    if (m) {
+      expect(parseInt(m[1])).toBeGreaterThanOrEqual(0);
+      expect(parseInt(m[1])).toBeLessThanOrEqual(100);
+    }
+  });
+
+  it("ASSESS_PROTOCOL_RISK handler responds with not-found for unknown protocol", async () => {
+    const calls: { text: string }[] = [];
+    await assessRiskAction.handler!(
+      mockRuntime,
+      makeMemory("risk NonexistentProtocolXYZ999"),
+      undefined,
+      {},
+      async (r) => calls.push(r)
+    );
+    const final = calls[calls.length - 1]?.text ?? "";
+    expect(final).toMatch(/could not find|not found/i);
+  });
+
+  it("COMPARE_PROTOCOLS handler returns markdown with Protocol Comparison header", async () => {
+    const calls: { text: string }[] = [];
+    await compareProtocolsAction.handler!(
+      mockRuntime,
+      makeMemory("Aave V3 vs Compound"),
+      undefined,
+      {},
+      async (r) => calls.push(r)
+    );
+    const final = calls[calls.length - 1]?.text ?? "";
+    expect(final).toMatch(/Protocol Comparison/);
+  });
+
+  it("COMPARE_PROTOCOLS handler table contains both protocol names", async () => {
+    const calls: { text: string }[] = [];
+    await compareProtocolsAction.handler!(
+      mockRuntime,
+      makeMemory("Aave V3 vs Compound"),
+      undefined,
+      {},
+      async (r) => calls.push(r)
+    );
+    const final = calls[calls.length - 1]?.text ?? "";
+    expect(final).toContain("Aave");
+    expect(final).toContain("Compound");
+  });
+
+  it("COMPARE_PROTOCOLS handler markdown includes Security Score row", async () => {
+    const calls: { text: string }[] = [];
+    await compareProtocolsAction.handler!(
+      mockRuntime,
+      makeMemory("Aave V3 vs Compound"),
+      undefined,
+      {},
+      async (r) => calls.push(r)
+    );
+    const final = calls[calls.length - 1]?.text ?? "";
+    expect(final).toMatch(/Security Score/);
+    expect(final).toMatch(/\/100/);
+  });
+
+  it("COMPARE_PROTOCOLS handler handles missing second protocol", async () => {
+    const calls: { text: string }[] = [];
+    await compareProtocolsAction.handler!(
+      mockRuntime,
+      makeMemory("Aave V3 vs NonexistentProtocol999"),
+      undefined,
+      {},
+      async (r) => calls.push(r)
+    );
+    const final = calls[calls.length - 1]?.text ?? "";
+    expect(final).toMatch(/could not find|not found/i);
+  });
+});
+

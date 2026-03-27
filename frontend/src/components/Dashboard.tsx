@@ -2,6 +2,17 @@ import { useEffect, useState, useRef, useCallback } from "react";
 import type { View, Protocol, Exploit } from "../lib/types";
 import { fetchProtocols, getExploits, getTotalExploitLoss, fetchHealth, detectAnomalies, formatUsd, getExploitsByTechnique, fetchExploitsLive } from "../lib/api";
 
+/* ─── Skeleton card (loading state) ─── */
+function SkeletonStatCard() {
+  return (
+    <div className="card space-y-2">
+      <div className="h-2.5 w-1/3 bg-zinc-800 animate-pulse rounded" />
+      <div className="h-8 w-1/2 bg-zinc-800 animate-pulse rounded" />
+      <div className="h-2.5 w-2/5 bg-zinc-800 animate-pulse rounded" />
+    </div>
+  );
+}
+
 /* ─── Count-up animation hook ─── */
 function useCountUp(target: number, duration = 1200): number {
   const [display, setDisplay] = useState(0);
@@ -133,7 +144,7 @@ function ExploitTimeline({ exploits }: { exploits: Exploit[] }) {
       <h3 className="text-sm font-medium text-zinc-400 mb-3">Major Exploits</h3>
       <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
         {exploits.slice(0, 12).map((e, i) => (
-          <div key={i} className="flex items-start gap-2 text-xs group hover:bg-zinc-800/50 rounded p-1 -m-1 transition-colors">
+          <div key={i} className="flex items-start gap-2 text-xs group hover:bg-zinc-800/50 rounded p-1 -m-1 transition-colors animate-fade-in-up" style={{ animationDelay: `${i * 55}ms` }}>
             <span className="text-zinc-600 font-mono w-20 shrink-0">{e.date}</span>
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2">
@@ -223,12 +234,13 @@ export default function Dashboard({ onNavigate }: { onNavigate: (v: View) => voi
   const [latency, setLatency] = useState<number>(0);
   const [exploits, setExploits] = useState<Exploit[]>(getExploits());
   const [lastRefresh, setLastRefresh] = useState<number>(Date.now());
+  const [error, setError] = useState<string | null>(null);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const loadData = () => {
     fetchProtocols()
-      .then(setProtocols)
-      .catch(() => setProtocols([]))
+      .then((data) => { setProtocols(data); setError(null); })
+      .catch(() => { setProtocols([]); setError("Failed to load protocol data. Retrying..."); })
       .finally(() => setLoading(false));
     fetchHealth().then((h) => {
       setHealthStatus(h.status);
@@ -290,35 +302,56 @@ export default function Dashboard({ onNavigate }: { onNavigate: (v: View) => voi
         </div>
       </div>
 
+      {/* Error banner */}
+      {error && (
+        <div className="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-red-950/30 border border-red-800/40 text-sm text-red-400">
+          <svg className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m0 3.75h.008v.008H12v-.008zm9-3.75a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+          {error}
+        </div>
+      )}
+
       {/* Stat Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <AnimatedStatCard
-          label="Protocols Monitored"
-          numericValue={loading ? 0 : protocols.length}
-          formatter={(n) => String(Math.round(n))}
-          sub="via DefiLlama API"
-        />
-        <AnimatedStatCard
-          label="Total TVL"
-          numericValue={loading ? 0 : totalTvl}
-          formatter={formatUsd}
-          sub={`Market ${avgChange >= 0 ? "+" : ""}${avgChange.toFixed(1)}% (24h)`}
-          accent={avgChange >= 0 ? "text-emerald-400" : "text-red-400"}
-          anomaly={hasAnomalies}
-        />
-        <AnimatedStatCard
-          label="Tracked Exploit Losses"
-          numericValue={totalLoss}
-          formatter={formatUsd}
-          sub={`${exploits.length} incidents analyzed`}
-          accent="text-red-400"
-        />
-        <StatCard
-          label="Nosana Status"
-          value={healthStatus === "healthy" ? "Online" : healthStatus}
-          sub="Decentralized GPU inference"
-          accent={healthStatus === "healthy" ? "text-emerald-400" : "text-amber-400"}
-        />
+        {loading ? (
+          <>
+            <SkeletonStatCard />
+            <SkeletonStatCard />
+            <SkeletonStatCard />
+            <SkeletonStatCard />
+          </>
+        ) : (
+          <>
+            <AnimatedStatCard
+              label="Protocols Monitored"
+              numericValue={protocols.length}
+              formatter={(n) => String(Math.round(n))}
+              sub="via DefiLlama API"
+            />
+            <AnimatedStatCard
+              label="Total TVL"
+              numericValue={totalTvl}
+              formatter={formatUsd}
+              sub={`Market ${avgChange >= 0 ? "+" : ""}${avgChange.toFixed(1)}% (24h)`}
+              accent={avgChange >= 0 ? "text-emerald-400" : "text-red-400"}
+              anomaly={hasAnomalies}
+            />
+            <AnimatedStatCard
+              label="Tracked Exploit Losses"
+              numericValue={totalLoss}
+              formatter={formatUsd}
+              sub={`${exploits.length} incidents analyzed`}
+              accent="text-red-400"
+            />
+            <StatCard
+              label="Nosana Status"
+              value={healthStatus === "healthy" ? "Online" : healthStatus}
+              sub="Decentralized GPU inference"
+              accent={healthStatus === "healthy" ? "text-emerald-400" : "text-amber-400"}
+            />
+          </>
+        )}
       </div>
 
       {/* Analysis Pipeline Visualization */}

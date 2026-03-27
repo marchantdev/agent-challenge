@@ -3,7 +3,7 @@ import type { ChatMessage } from "../lib/types";
 import { sendMessage } from "../lib/api";
 import { renderMarkdown } from "../lib/markdown";
 import { ChainBadge } from "./ChainBadge";
-import SecurityGauge, { parseSecurityScore } from "./SecurityGauge";
+import SecurityGauge, { parseSecurityScore, parseCompareScores } from "./SecurityGauge";
 
 const SUGGESTIONS = [
   "Assess Aave V3 risk",
@@ -38,6 +38,26 @@ function MessageBubble({ msg }: { msg: ChatMessage }) {
           {isUser ? msg.text : renderMarkdown(msg.text)}
         </div>
         {!isUser && (() => {
+          // Compare: side-by-side gauges
+          const compare = parseCompareScores(msg.text);
+          if (compare) {
+            return (
+              <div className="mt-3 pt-3 border-t border-zinc-700/50">
+                <div className="flex justify-around gap-2">
+                  <div className="flex flex-col items-center">
+                    <span className="text-[10px] text-zinc-500 mb-1 font-medium truncate max-w-[120px]">{compare.nameA}</span>
+                    <SecurityGauge score={compare.scoreA} size={140} />
+                  </div>
+                  <div className="w-px bg-zinc-700/50 self-stretch" />
+                  <div className="flex flex-col items-center">
+                    <span className="text-[10px] text-zinc-500 mb-1 font-medium truncate max-w-[120px]">{compare.nameB}</span>
+                    <SecurityGauge score={compare.scoreB} size={140} />
+                  </div>
+                </div>
+              </div>
+            );
+          }
+          // Single protocol: centered gauge
           const parsed = parseSecurityScore(msg.text);
           if (!parsed) return null;
           return (
@@ -45,7 +65,7 @@ function MessageBubble({ msg }: { msg: ChatMessage }) {
               <SecurityGauge
                 score={parsed.score}
                 components={parsed.components.length > 0 ? parsed.components : undefined}
-                size={140}
+                size={150}
               />
             </div>
           );
