@@ -1,13 +1,12 @@
 /**
- * LLM Proxy — chat/completions → /v1/responses adapter
+ * LLM Proxy — /v1/responses → chat/completions adapter
  *
- * The Nosana-hosted Qwen model uses the OpenAI Responses API (/v1/responses)
- * rather than the legacy Chat Completions API (/v1/chat/completions).
- * ElizaOS's @elizaos/plugin-openai always calls /v1/chat/completions, so
- * this proxy intercepts those calls and translates them.
+ * ElizaOS v1.7+ calls the OpenAI Responses API (/v1/responses) by default.
+ * Nosana-hosted Qwen only supports the Chat Completions API (/v1/chat/completions).
+ * This proxy intercepts /v1/responses calls and translates them to /v1/chat/completions.
  *
  * Run on localhost:4001 (LLM_PROXY_PORT).
- * Set OPENAI_API_URL=http://localhost:4001 for ElizaOS.
+ * Set OPENAI_BASE_URL=http://localhost:4001 for ElizaOS.
  * Set NOSANA_INFERENCE_URL to the actual Nosana inference endpoint.
  */
 
@@ -22,65 +21,58 @@ if (!NOSANA_INFERENCE_URL) {
   process.exit(1);
 }
 
-/** Convert OpenAI chat/completions request body → /v1/responses request body */
-function chatToResponses(body: any): any {
-  const messages: Array<{ role: string; content: string }> = body.messages || [];
+/** Convert OpenAI Responses API request body → chat/completions request body */
+function responsesToChat(body: any): any {
+  const input: Array<{ role: string; content: string }> = body.input || [];
+  const instructions: string | undefined = body.instructions;
 
-  const systemMessages = messages.filter((m) => m.role === "system");
-  const conversationMessages = messages.filter((m) => m.role !== "system");
+  const messages: Array<{ role: string; content: string }> = [];
+
+  // instructions → system message
+  if (instructions) {
+    messages.push({ role: "system", content: instructions });
+  }
+
+  // input items → messages
+  for (const item of input) {
+    messages.push({
+      role: item.role,
+      content: typeof item.content === "string" ? item.content : JSON.stringify(item.content),
+    });
+  }
 
   const req: any = {
     model: body.model,
-    input: conversationMessages.map((m) => ({
-      role: m.role,
-      content: typeof m.content === "string" ? m.content : JSON.stringify(m.content),
-    })),
+    messages,
   };
 
-  if (systemMessages.length > 0) {
-    req.instructions = systemMessages.map((m) => m.content).join("\n\n");
-  }
-
   if (body.temperature !== undefined) req.temperature = body.temperature;
-  if (body.max_tokens !== undefined) req.max_output_tokens = body.max_tokens;
+  if (body.max_output_tokens !== undefined) req.max_tokens = body.max_output_tokens;
   if (body.stream) req.stream = body.stream;
 
   return req;
 }
 
-/** Convert /v1/responses response body → chat/completions response body */
-function responsesToChat(data: any, originalModel: string): any {
-  // Extract text from response output
-  let text = "";
-  const output = data.output;
-  if (Array.isArray(output) && output.length > 0) {
-    const firstOutput = output[0];
-    if (Array.isArray(firstOutput?.content) && firstOutput.content.length > 0) {
-      text = firstOutput.content[0]?.text || "";
-    } else if (typeof firstOutput?.content === "string") {
-      text = firstOutput.content;
-    } else if (typeof firstOutput?.text === "string") {
-      text = firstOutput.text;
-    }
-  } else if (typeof output === "string") {
-    text = output;
-  }
+/** Convert chat/completions response body → /v1/responses response body */
+function chatToResponses(data: any): any {
+  const choice = data.choices?.[0];
+  const text = choice?.message?.content || "";
 
   return {
-    id: data.id || `chatcmpl-${Date.now()}`,
-    object: "chat.completion",
-    created: data.created_at || Math.floor(Date.now() / 1000),
-    model: data.model || originalModel,
-    choices: [
+    id: data.id || `resp-${Date.now()}`,
+    object: "response",
+    created_at: data.created || Math.floor(Date.now() / 1000),
+    model: data.model || "",
+    output: [
       {
-        index: 0,
-        message: { role: "assistant", content: text },
-        finish_reason: data.incomplete_details ? "length" : "stop",
+        type: "message",
+        role: "assistant",
+        content: [{ type: "output_text", text }],
       },
     ],
     usage: {
-      prompt_tokens: data.usage?.input_tokens || 0,
-      completion_tokens: data.usage?.output_tokens || 0,
+      input_tokens: data.usage?.prompt_tokens || 0,
+      output_tokens: data.usage?.completion_tokens || 0,
       total_tokens: data.usage?.total_tokens || 0,
     },
   };
@@ -96,27 +88,27 @@ const server = createServer(async (req: IncomingMessage, res: ServerResponse) =>
   const url = req.url || "/";
   const method = req.method || "GET";
 
-  // Intercept POST /v1/chat/completions → translate to /v1/responses
-  if (method === "POST" && (url === "/v1/chat/completions" || url.endsWith("/chat/completions"))) {
+  // Intercept POST /v1/responses → translate to /v1/chat/completions
+  if (method === "POST" && (url === "/v1/responses" || url.endsWith("/responses"))) {
     try {
       const rawBody = await readBody(req);
-      const chatReq = JSON.parse(rawBody);
-      const responsesReq = chatToResponses(chatReq);
+      const responsesReq = JSON.parse(rawBody);
+      const chatReq = responsesToChat(responsesReq);
 
       console.log(
-        `[LLM Proxy] chat/completions → /v1/responses | model=${chatReq.model} | msgs=${chatReq.messages?.length}`
+        `[LLM Proxy] /v1/responses → chat/completions | model=${responsesReq.model} | input=${responsesReq.input?.length}`
       );
 
       const ctrl = new AbortController();
       const tid = setTimeout(() => ctrl.abort(), 120000);
 
-      const upstream = await fetch(`${NOSANA_INFERENCE_URL}/v1/responses`, {
+      const upstream = await fetch(`${NOSANA_INFERENCE_URL}/v1/chat/completions`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${API_KEY}`,
         },
-        body: JSON.stringify(responsesReq),
+        body: JSON.stringify(chatReq),
         signal: ctrl.signal,
       });
       clearTimeout(tid);
@@ -130,16 +122,51 @@ const server = createServer(async (req: IncomingMessage, res: ServerResponse) =>
         return;
       }
 
-      const responseData = JSON.parse(upstreamText);
-      const chatResponse = responsesToChat(responseData, chatReq.model || "");
+      const chatResponse = JSON.parse(upstreamText);
+      const responsesResponse = chatToResponses(chatResponse);
 
       res.writeHead(200, { "Content-Type": "application/json" });
-      res.end(JSON.stringify(chatResponse));
+      res.end(JSON.stringify(responsesResponse));
     } catch (err: any) {
       const isTimeout = err?.name === "AbortError";
       console.error(`[LLM Proxy] Error: ${err.message}`);
       res.writeHead(isTimeout ? 504 : 500, { "Content-Type": "application/json" });
       res.end(JSON.stringify({ error: isTimeout ? "LLM timeout" : err.message }));
+    }
+    return;
+  }
+
+  // Also intercept POST /v1/chat/completions in case ElizaOS falls back to it —
+  // forward directly to Nosana without translation
+  if (method === "POST" && (url === "/v1/chat/completions" || url.endsWith("/chat/completions"))) {
+    try {
+      const rawBody = await readBody(req);
+      const chatReq = JSON.parse(rawBody);
+
+      console.log(
+        `[LLM Proxy] chat/completions passthrough | model=${chatReq.model} | msgs=${chatReq.messages?.length}`
+      );
+
+      const ctrl = new AbortController();
+      const tid = setTimeout(() => ctrl.abort(), 120000);
+
+      const upstream = await fetch(`${NOSANA_INFERENCE_URL}/v1/chat/completions`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${API_KEY}`,
+        },
+        body: rawBody,
+        signal: ctrl.signal,
+      });
+      clearTimeout(tid);
+
+      const data = await upstream.text();
+      res.writeHead(upstream.status, { "Content-Type": "application/json" });
+      res.end(data);
+    } catch (err: any) {
+      res.writeHead(502, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: err.message }));
     }
     return;
   }
@@ -172,5 +199,5 @@ const server = createServer(async (req: IncomingMessage, res: ServerResponse) =>
 
 server.listen(PROXY_PORT, "127.0.0.1", () => {
   console.log(`[LLM Proxy] Listening on localhost:${PROXY_PORT}`);
-  console.log(`[LLM Proxy] Translating chat/completions → ${NOSANA_INFERENCE_URL}/v1/responses`);
+  console.log(`[LLM Proxy] Translating /v1/responses → ${NOSANA_INFERENCE_URL}/v1/chat/completions`);
 });
