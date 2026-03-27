@@ -16,8 +16,10 @@ sleep 3
 echo "[start.sh] Frontend server running (PID $SERVER_PID)"
 echo "[start.sh] Starting ElizaOS agent in background..."
 
-# Start elizaos in background — errors don't crash the server
-elizaos start --character /app/characters/agent.character.json &
+# Start elizaos in background, tee output to log file for /api/logs endpoint
+LOG_FILE="/tmp/elizaos.log"
+echo "[start.sh] Logging ElizaOS output to $LOG_FILE"
+elizaos start --character /app/characters/agent.character.json >> "$LOG_FILE" 2>&1 &
 ELIZAOS_PID=$!
 
 echo "[start.sh] ElizaOS started (PID $ELIZAOS_PID)"

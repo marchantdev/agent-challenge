@@ -7,7 +7,7 @@
  */
 
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
-import { readFile, stat } from "node:fs/promises";
+import { readFile, stat, access } from "node:fs/promises";
 import { join, extname, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { logger } from "@elizaos/core";
@@ -238,6 +238,27 @@ async function handleExploits(res: ServerResponse): Promise<void> {
   }
 }
 
+async function handleLogs(res: ServerResponse, url: string): Promise<void> {
+  const LOG_FILE = "/tmp/elizaos.log";
+  const params = new URLSearchParams(url.includes("?") ? url.split("?")[1] : "");
+  const lines = Math.min(parseInt(params.get("lines") || "200"), 1000);
+  try {
+    await access(LOG_FILE);
+    const content = await readFile(LOG_FILE, "utf8");
+    const allLines = content.split("\n");
+    const tail = allLines.slice(-lines).join("\n");
+    res.writeHead(200, {
+      "Content-Type": "text/plain; charset=utf-8",
+      "Access-Control-Allow-Origin": "*",
+      "Cache-Control": "no-cache",
+    });
+    res.end(tail);
+  } catch {
+    res.writeHead(404, { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" });
+    res.end(JSON.stringify({ error: "Log file not found — ElizaOS may not have started yet" }));
+  }
+}
+
 function handleEvaluatorStats(res: ServerResponse): void {
   const totalResponses = Object.values(actionCounts).reduce((s, c) => s + c, 0);
   const securityScoresIncluded =
@@ -270,6 +291,7 @@ const server = createServer(async (req, res) => {
   if (url === "/api/health" || url === "/health") { handleHealth(res); return; }
   if (url === "/api/metrics" || url === "/metrics") { handleMetrics(res); return; }
   if (url === "/api/evaluator-stats") { handleEvaluatorStats(res); return; }
+  if (url.startsWith("/api/logs") || url.startsWith("/logs")) { await handleLogs(res, url); return; }
 
   // Exploits API: GET /api/exploits — server-side rekt.news fetch (no CORS)
   if (url === "/api/exploits" && req.method === "GET") {
