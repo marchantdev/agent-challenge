@@ -42,16 +42,17 @@ export default function NosanaStatus() {
   const [network, setNetwork] = useState<NosanaNetwork | null>(null);
   const [evaluatorStats, setEvaluatorStats] = useState<EvaluatorStats | null>(null);
   const [refreshing, setRefreshing] = useState(false);
-  const [initialLoad, setInitialLoad] = useState(true);
 
   const loadData = () => {
     setRefreshing(true);
+    // Critical data: health unblocks the skeleton immediately (~0.5s)
+    fetchHealth().then(setHealth);
+    fetchMetrics().then(setMetrics);
+    // Secondary data loads independently — never blocks primary display
     Promise.all([
-      fetchHealth().then(setHealth),
-      fetchMetrics().then(setMetrics),
       fetchNosanaNetwork().then(setNetwork),
       fetchEvaluatorStats().then(setEvaluatorStats),
-    ]).finally(() => { setRefreshing(false); setInitialLoad(false); });
+    ]).finally(() => setRefreshing(false));
   };
 
   useEffect(() => { loadData(); }, []);
@@ -93,7 +94,7 @@ export default function NosanaStatus() {
           </span>
         </div>
 
-        {initialLoad ? (
+        {health === null ? (
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             {Array.from({ length: 4 }).map((_, i) => (
               <div key={i} className="card space-y-2">
@@ -105,7 +106,7 @@ export default function NosanaStatus() {
         ) : (
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <MetricCard label="Uptime" value={health ? formatUptime(health.uptimeSeconds) : "\u2014"} />
-            <MetricCard label="Inference Latency" value={health?.inferenceLatencyMs || "\u2014"} unit="ms" accent={health && health.inferenceLatencyMs < 500 ? "text-emerald-400" : ""} />
+            <MetricCard label="Inference Latency" value={health?.inferenceLatencyMs != null ? health.inferenceLatencyMs : "\u2014"} unit="ms" accent={health && health.inferenceLatencyMs < 500 ? "text-emerald-400" : ""} />
             <MetricCard label="Actions Triggered" value={health?.actionsTriggered || 0} />
             <MetricCard label="Model" value={health?.model || "Qwen3.5-27B"} />
           </div>
