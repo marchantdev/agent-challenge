@@ -144,11 +144,11 @@ function handleHealth(res: ServerResponse): void {
 async function handleSecurityScoreBadge(res: ServerResponse, protocol: string): Promise<void> {
   try {
     const protocols = (await cachedFetch("https://api.llama.fi/protocols")) as any[];
-    const match = protocols.find(
-      (p: any) =>
-        p.name.toLowerCase() === protocol.toLowerCase() ||
-        p.slug.toLowerCase() === protocol.toLowerCase()
-    );
+    const q = protocol.toLowerCase();
+    const match =
+      protocols.find((p: any) => p.name.toLowerCase() === q || p.slug.toLowerCase() === q) ||
+      protocols.find((p: any) => p.slug.toLowerCase().startsWith(q + "-") || p.slug.toLowerCase() === q) ||
+      protocols.find((p: any) => p.name.toLowerCase().startsWith(q + " "));
 
     let score = 0;
     let label = "Unknown";
@@ -199,11 +199,11 @@ async function handleSecurityScoreBadge(res: ServerResponse, protocol: string): 
 async function handleSecurityScore(res: ServerResponse, protocol: string): Promise<void> {
   try {
     const protocols = (await cachedFetch("https://api.llama.fi/protocols")) as any[];
-    const match = protocols.find(
-      (p: any) =>
-        p.name.toLowerCase() === protocol.toLowerCase() ||
-        p.slug.toLowerCase() === protocol.toLowerCase()
-    );
+    const q = protocol.toLowerCase();
+    const match =
+      protocols.find((p: any) => p.name.toLowerCase() === q || p.slug.toLowerCase() === q) ||
+      protocols.find((p: any) => p.slug.toLowerCase().startsWith(q + "-") || p.slug.toLowerCase() === q) ||
+      protocols.find((p: any) => p.name.toLowerCase().startsWith(q + " "));
     if (!match) {
       res.writeHead(404, { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" });
       res.end(JSON.stringify({ error: `Protocol "${protocol}" not found on DefiLlama` }));
@@ -323,8 +323,8 @@ const server = createServer(async (req, res) => {
     return;
   }
 
-  // Security Score Badge: GET /api/security-score/:protocol/badge
-  const badgeMatch = url.match(/^\/api\/security-score\/([^/?]+)\/badge$/);
+  // Security Score Badge: GET /api/security-score/:protocol/badge or /badge.svg
+  const badgeMatch = url.match(/^\/api\/security-score\/([^/?]+)\/badge(?:\.svg)?$/);
   if (badgeMatch && req.method === "GET") {
     await handleSecurityScoreBadge(res, decodeURIComponent(badgeMatch[1]));
     return;

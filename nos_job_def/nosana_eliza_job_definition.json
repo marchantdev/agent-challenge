@@ -14,6 +14,7 @@
         "env": {
           "OPENAI_API_KEY": "nosana",
           "OPENAI_BASE_URL": "https://3gsrmj6gchzyws9bnc835apd4fh6t5tyeppmbxmzrzhn.node.k8s.prd.nos.ci/v1",
+          "NOSANA_INFERENCE_URL": "https://3gsrmj6gchzyws9bnc835apd4fh6t5tyeppmbxmzrzhn.node.k8s.prd.nos.ci/v1",
           "OPENAI_SMALL_MODEL": "Qwen3.5-27B-AWQ-4bit",
           "OPENAI_LARGE_MODEL": "Qwen3.5-27B-AWQ-4bit",
           "SERVER_PORT": "3000",
