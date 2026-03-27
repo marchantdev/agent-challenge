@@ -64,6 +64,18 @@ async function serveStatic(res: ServerResponse, urlPath: string): Promise<boolea
   return true;
 }
 
+async function isAgentReady(): Promise<boolean> {
+  try {
+    const ctrl = new AbortController();
+    const tid = setTimeout(() => ctrl.abort(), 2000);
+    const r = await fetch(`http://localhost:${AGENT_PORT}/agents`, { signal: ctrl.signal });
+    clearTimeout(tid);
+    return r.ok;
+  } catch {
+    return false;
+  }
+}
+
 async function proxyToAgent(req: IncomingMessage, res: ServerResponse): Promise<void> {
   const start = Date.now();
   requestCount++;
@@ -73,11 +85,15 @@ async function proxyToAgent(req: IncomingMessage, res: ServerResponse): Promise<
     let body = "";
     for await (const chunk of req) body += chunk;
 
+    const ctrl = new AbortController();
+    const tid = setTimeout(() => ctrl.abort(), 120000); // 2-min timeout for LLM calls
     const proxyRes = await fetch(url, {
       method: req.method,
       headers: { "Content-Type": "application/json" },
       body: req.method !== "GET" ? body : undefined,
+      signal: ctrl.signal,
     });
+    clearTimeout(tid);
 
     const data = await proxyRes.text();
     totalResponseTime += Date.now() - start;
@@ -96,11 +112,18 @@ async function proxyToAgent(req: IncomingMessage, res: ServerResponse): Promise<
 
     res.writeHead(proxyRes.status, { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" });
     res.end(data);
-  } catch (err) {
+  } catch (err: any) {
     errorCount++;
-    res.writeHead(502, { "Content-Type": "application/json" });
-    res.end(JSON.stringify({ error: "Agent unavailable" }));
+    const isTimeout = err?.name === "AbortError";
+    res.writeHead(isTimeout ? 504 : 502, { "Content-Type": "application/json" });
+    res.end(JSON.stringify({ error: isTimeout ? "Agent timeout — LLM response took too long" : "Agent starting up — please retry in 30 seconds" }));
   }
+}
+
+async function handleAgentStatus(res: ServerResponse): Promise<void> {
+  const ready = await isAgentReady();
+  res.writeHead(200, { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*", "Cache-Control": "no-cache" });
+  res.end(JSON.stringify({ ready, agent: ready ? "online" : "starting", port: AGENT_PORT }));
 }
 
 function handleHealth(res: ServerResponse): void {
@@ -291,6 +314,7 @@ const server = createServer(async (req, res) => {
   if (url === "/api/health" || url === "/health") { handleHealth(res); return; }
   if (url === "/api/metrics" || url === "/metrics") { handleMetrics(res); return; }
   if (url === "/api/evaluator-stats") { handleEvaluatorStats(res); return; }
+  if (url === "/api/agent-status") { await handleAgentStatus(res); return; }
   if (url.startsWith("/api/logs") || url.startsWith("/logs")) { await handleLogs(res, url); return; }
 
   // Exploits API: GET /api/exploits — server-side rekt.news fetch (no CORS)
@@ -314,8 +338,8 @@ const server = createServer(async (req, res) => {
   }
 
   // Proxy API calls to ElizaOS
+  // NOTE: ElizaOS v1.7 routes at /api/... — do NOT strip the /api prefix
   if (url.startsWith("/api/")) {
-    req.url = url.replace("/api", "");
     await proxyToAgent(req, res);
     return;
   }

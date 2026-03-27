@@ -197,27 +197,115 @@ export async function fetchExploitsLive(): Promise<Exploit[]> {
   return fallback;
 }
 
-// --- Agent chat ---
+// --- Agent chat (ElizaOS v1.7 messaging API) ---
+// ElizaOS v1.7 uses central channels for messaging — not the legacy /{agentId}/message endpoint
 
-export async function sendMessage(agentId: string, text: string): Promise<string> {
+let cachedAgentId: string | null = null;
+let cachedChannelId: string | null = null;
+let cachedServerId: string | null = null;
+const TEST_USER_ID = "11111111-1111-1111-1111-111111111111";
+
+async function getAgentId(): Promise<string> {
+  if (cachedAgentId) return cachedAgentId;
+  const res = await fetch(`${AGENT_BASE}/agents`, { signal: AbortSignal.timeout(5000) });
+  if (!res.ok) throw new Error(`/api/agents returned ${res.status}`);
+  const data = await res.json();
+  const agents: any[] = data.agents ?? data.data ?? (Array.isArray(data) ? data : []);
+  if (agents.length === 0) throw new Error("No agents running");
+  cachedAgentId = agents[0].id ?? agents[0].agentId;
+  return cachedAgentId!;
+}
+
+async function getOrCreateChannel(agentId: string): Promise<{ channelId: string; serverId: string }> {
+  if (cachedChannelId && cachedServerId) return { channelId: cachedChannelId, serverId: cachedServerId };
+
+  // Get message server
+  const serversRes = await fetch(`${AGENT_BASE}/messaging/message-servers`, { signal: AbortSignal.timeout(5000) });
+  if (!serversRes.ok) throw new Error(`/api/messaging/message-servers returned ${serversRes.status}`);
+  const serversData = await serversRes.json();
+  const servers: any[] = serversData.messageServers ?? serversData.data ?? serversData ?? [];
+  if (servers.length === 0) throw new Error("No message servers");
+  const serverId = servers[0].id;
+
+  // Create channel
+  const chanRes = await fetch(`${AGENT_BASE}/messaging/central-channels`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    signal: AbortSignal.timeout(8000),
+    body: JSON.stringify({
+      name: "axiom-dashboard",
+      message_server_id: serverId,
+      participantCentralUserIds: [TEST_USER_ID],
+      type: "GROUP",
+      metadata: { dashboard: true },
+    }),
+  });
+  if (!chanRes.ok) throw new Error(`Channel creation failed: ${chanRes.status}`);
+  const chanData = await chanRes.json();
+  const channelId = chanData.data?.id ?? chanData.id;
+
+  // Add agent to channel
   try {
-    const res = await fetch(`${AGENT_BASE}/${agentId}/message`, {
+    await fetch(`${AGENT_BASE}/messaging/central-channels/${channelId}/agents`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ agentId }),
+    });
+  } catch { /* non-fatal */ }
+
+  cachedChannelId = channelId;
+  cachedServerId = serverId;
+  return { channelId, serverId };
+}
+
+export async function sendMessage(_agentId: string, text: string): Promise<string> {
+  try {
+    const agentId = await getAgentId();
+    const { channelId, serverId } = await getOrCreateChannel(agentId);
+
+    const postRes = await fetch(`${AGENT_BASE}/messaging/central-channels/${channelId}/messages`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      signal: AbortSignal.timeout(120000), // 2 min for LLM calls
       body: JSON.stringify({
-        text,
-        userId: "axiom-dashboard",
-        roomId: "axiom-dashboard-room",
+        author_id: TEST_USER_ID,
+        content: text,
+        message_server_id: serverId,
+        metadata: { user_display_name: "Axiom User" },
+        source_type: "dashboard",
       }),
     });
-    if (!res.ok) throw new Error(`Agent returned ${res.status}`);
-    const data = await res.json();
-    if (Array.isArray(data)) {
-      return data.map((m: any) => m.text).join("\n\n");
+    if (!postRes.ok) throw new Error(`Post message failed: ${postRes.status}`);
+
+    // Poll for agent response (up to 90 seconds)
+    const startTime = Date.now();
+    for (let attempt = 0; attempt < 60; attempt++) {
+      await new Promise((r) => setTimeout(r, 1500));
+      try {
+        const pollRes = await fetch(`${AGENT_BASE}/messaging/central-channels/${channelId}/messages?limit=20`, {
+          signal: AbortSignal.timeout(5000),
+        });
+        if (!pollRes.ok) continue;
+        const pollData = await pollRes.json();
+        const messages: any[] = pollData.messages ?? pollData.data ?? [];
+        const agentMsgs = messages.filter(
+          (m: any) => m.authorId === agentId && new Date(m.createdAt).getTime() > startTime
+        );
+        if (agentMsgs.length > 0) {
+          agentMsgs.sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+          return agentMsgs[0].content ?? agentMsgs[0].text ?? "No response content";
+        }
+      } catch { /* continue polling */ }
     }
-    return data.text || JSON.stringify(data);
-  } catch {
-    return "Agent is currently offline. Please check the Nosana deployment status.";
+    throw new Error("Timeout waiting for agent response");
+  } catch (err: any) {
+    // Reset channel on error so next attempt creates fresh
+    cachedChannelId = null;
+    const msg = err?.message ?? String(err);
+    if (msg.includes("agents running") || msg.includes("/api/agents")) {
+      return "⚠️ Axiom agent is starting up — please wait 60 seconds and try again.";
+    }
+    return `⚠️ ${msg.includes("Timeout") ? "Axiom is thinking (slow GPU response) — try a simpler question" : "Axiom is unavailable. Try again in a moment."}`;
   }
 }
 
