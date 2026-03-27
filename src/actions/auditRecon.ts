@@ -37,13 +37,38 @@ export const auditReconAction: Action = {
       const info = rR.ok ? await rR.json() as RepoInfo : {};
       const recentCommits = (Array.isArray(commits) ? commits : []).slice(0, 5).map(c =>
         `| \`${c.sha.slice(0, 7)}\` | ${c.commit.message.split("\n")[0].slice(0, 60)} | ${c.commit.author.date.slice(0, 10)} |`);
-      const auditFiles = (Array.isArray(files) ? files : []).filter(f => /audit|security|review|findings/i.test(f.name)).map(f => `- \`${f.name}\``);
+
+      // Find audit-named files in repo root
+      const rootFiles = Array.isArray(files) ? files : [];
+      const auditFiles = rootFiles.filter(f => /audit|security|review|findings/i.test(f.name)).map(f => `- \`${f.name}\``);
+
+      // Check audit subdirectories (audits/, audit/, security/, findings/) for additional reports
+      type DirEntry = { name: string; type: string };
+      const auditDirs = rootFiles.filter(
+        (f): f is DirEntry & FileEntry => "type" in f && (f as DirEntry).type === "dir" && /^(audits?|security|findings?|reports?)$/i.test(f.name)
+      );
+      let subAuditFiles: string[] = [];
+      if (auditDirs.length > 0) {
+        const dirResults = await Promise.all(
+          auditDirs.map(d =>
+            fetch(`${base}/contents/${d.name}`, { headers })
+              .then(r => r.ok ? r.json() as Promise<FileEntry[]> : [])
+              .then(entries => (Array.isArray(entries) ? entries : [])
+                .filter(e => /\.(pdf|md|txt)$/i.test(e.name) || /audit|review|finding|report/i.test(e.name))
+                .map(e => `- \`${d.name}/${e.name}\``)
+              )
+          )
+        );
+        subAuditFiles = dirResults.flat();
+      }
+
+      const allAuditIndicators = [...auditFiles, ...subAuditFiles];
       const summary = [
         `## Recon: \`${repo}\``,
         `**${info.description || "N/A"}** | Stars: ${info.stargazers_count?.toLocaleString() || "?"} | Last push: ${info.pushed_at?.slice(0, 10) || "?"} | Lang: ${info.language || "?"}`,
         ``,
-        `### Audit Indicators`,
-        auditFiles.length > 0 ? auditFiles.join("\n") : "- None in repo root",
+        `### Audit Indicators (${allAuditIndicators.length} file${allAuditIndicators.length !== 1 ? "s" : ""} found)`,
+        allAuditIndicators.length > 0 ? allAuditIndicators.join("\n") : "- No audit files found in root or /audits, /security, /findings directories",
         ``,
         `### Recent Commits`,
         `| Hash | Message | Date |`,

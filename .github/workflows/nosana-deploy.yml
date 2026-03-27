@@ -1,12 +1,17 @@
 name: Deploy to Nosana
 
 # Automatically redeploys to Nosana on every push to main after Docker build.
-# Requires: NOSANA_PRIVATE_KEY repo secret (Solana keypair as base58 string)
+# Required secrets:
+#   NOSANA_PRIVATE_KEY — Solana keypair as base58 (wallet needs SOL + NOS)
+#   NOSANA_ENDPOINT    — Nosana inference endpoint URL (e.g. https://<node-id>.node.k8s.prd.nos.ci)
+#                        Get this from `nosana node ls` or the Nosana dashboard.
+#                        If not set, the job definition retains its current OPENAI_BASE_URL value.
 #
 # Setup:
 #   1. Settings → Secrets and variables → Actions → New repository secret
-#   2. Name: NOSANA_PRIVATE_KEY, Value: <Solana wallet private key as base58>
-#   3. Ensure wallet has sufficient SOL + NOS for job posting
+#   2. Add NOSANA_PRIVATE_KEY (base58 Solana wallet private key)
+#   3. Add NOSANA_ENDPOINT (Nosana GPU node inference URL)
+#   4. Ensure wallet has sufficient SOL + NOS for job posting
 #
 # Nosana CLI: https://learn.nosana.com/cli
 
@@ -84,11 +89,25 @@ jobs:
       - name: Install Nosana CLI
         run: npm install -g @nosana/cli
 
-      - name: Update job definition with latest image
+      - name: Update job definition with latest image and endpoint
+        env:
+          NOSANA_ENDPOINT: ${{ secrets.NOSANA_ENDPOINT }}
         run: |
           IMAGE_TAG="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest"
+          # Update Docker image tag
           jq --arg img "$IMAGE_TAG" '.ops[0].args.image = $img' \
             nos_job_def/nosana_eliza_job_definition.json > /tmp/job_def_updated.json
+          # Substitute Nosana inference endpoint if secret is configured
+          if [ -n "$NOSANA_ENDPOINT" ]; then
+            ENDPOINT_V1="${NOSANA_ENDPOINT%/}/v1"
+            jq --arg ep "$ENDPOINT_V1" '.ops[0].args.env.OPENAI_BASE_URL = $ep' \
+              /tmp/job_def_updated.json > /tmp/job_def_final.json
+            mv /tmp/job_def_final.json /tmp/job_def_updated.json
+            echo "Nosana endpoint configured: $ENDPOINT_V1"
+          else
+            echo "NOSANA_ENDPOINT secret not set — skipping endpoint substitution."
+            echo "Set it in repo secrets to enable fully automated deployment."
+          fi
           cp /tmp/job_def_updated.json nos_job_def/nosana_eliza_job_definition.json
           echo "Job definition updated to use image: $IMAGE_TAG"
 

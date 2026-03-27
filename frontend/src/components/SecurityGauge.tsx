@@ -152,20 +152,41 @@ function describeArc(cx: number, cy: number, r: number, startAngle: number, endA
 }
 
 // Helper: parse security scores from agent text (best-effort)
+// Handles both /10 and /100 scale (assessRisk/generateAuditReport emit /100)
 export function parseSecurityScore(text: string): { score: number; components: { name: string; score: number }[] } | null {
-  // Look for patterns like "Security Score: 7.5/10" or "Overall: 8/10"
-  const scoreMatch = text.match(/(?:security\s+score|overall\s*(?:score)?|risk\s+score)[:\s]*(\d+(?:\.\d+)?)\s*\/\s*10/i);
-  if (!scoreMatch) return null;
+  // Try /100 scale first (assessRisk.ts: "Security Score: 75/100")
+  const match100 = text.match(/(?:security\s+score|overall\s*(?:score)?|risk\s+score)[:\s]*(\d+(?:\.\d+)?)\s*\/\s*100/i);
+  if (match100) {
+    const score = parseFloat(match100[1]) / 10; // normalize to 0-10
+    const components: { name: string; score: number }[] = [];
 
-  const score = parseFloat(scoreMatch[1]);
+    // Component scores are out of /25 in table format: "| TVL Stability | 22 | 25 |" or "| TVL Stability | 22/25 |"
+    const compPatterns: { pattern: RegExp; name: string }[] = [
+      { pattern: /\|\s*TVL Stability\s*\|\s*(\d+(?:\.\d+)?)\s*(?:\/25)?[\s|]/, name: "TVL Stability" },
+      { pattern: /\|\s*(?:Audit\s*Coverage|Verification)\s*\|\s*(\d+(?:\.\d+)?)\s*(?:\/25)?[\s|]/, name: "Audit Coverage" },
+      { pattern: /\|\s*(?:Protocol\s*)?Maturity\s*\|\s*(\d+(?:\.\d+)?)\s*(?:\/25)?[\s|]/, name: "Protocol Maturity" },
+      { pattern: /\|\s*Exploit\s*History\s*\|\s*(\d+(?:\.\d+)?)\s*(?:\/25)?[\s|]/, name: "Exploit History" },
+    ];
+    for (const { pattern, name } of compPatterns) {
+      const m = text.match(pattern);
+      if (m) components.push({ name, score: (parseFloat(m[1]) / 25) * 10 }); // normalize /25 → /10
+    }
+
+    return { score, components };
+  }
+
+  // Fall back to /10 scale
+  const match10 = text.match(/(?:security\s+score|overall\s*(?:score)?|risk\s+score)[:\s]*(\d+(?:\.\d+)?)\s*\/\s*10(?!\d)/i);
+  if (!match10) return null;
+
+  const score = parseFloat(match10[1]);
   const components: { name: string; score: number }[] = [];
 
-  // Extract component scores
   const componentPatterns = [
-    { pattern: /tvl\s*(?:stability)?[:\s]*(\d+(?:\.\d+)?)\s*\/\s*10/i, name: "TVL Stability" },
-    { pattern: /audit\s*(?:coverage)?[:\s]*(\d+(?:\.\d+)?)\s*\/\s*10/i, name: "Audit Coverage" },
-    { pattern: /(?:protocol\s*)?maturity[:\s]*(\d+(?:\.\d+)?)\s*\/\s*10/i, name: "Protocol Maturity" },
-    { pattern: /exploit\s*(?:history)?[:\s]*(\d+(?:\.\d+)?)\s*\/\s*10/i, name: "Exploit History" },
+    { pattern: /tvl\s*(?:stability)?[:\s]*(\d+(?:\.\d+)?)\s*\/\s*10(?!\d)/i, name: "TVL Stability" },
+    { pattern: /audit\s*(?:coverage)?[:\s]*(\d+(?:\.\d+)?)\s*\/\s*10(?!\d)/i, name: "Audit Coverage" },
+    { pattern: /(?:protocol\s*)?maturity[:\s]*(\d+(?:\.\d+)?)\s*\/\s*10(?!\d)/i, name: "Protocol Maturity" },
+    { pattern: /exploit\s*(?:history)?[:\s]*(\d+(?:\.\d+)?)\s*\/\s*10(?!\d)/i, name: "Exploit History" },
   ];
 
   for (const { pattern, name } of componentPatterns) {
