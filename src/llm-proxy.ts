@@ -88,27 +88,29 @@ const server = createServer(async (req: IncomingMessage, res: ServerResponse) =>
   const url = req.url || "/";
   const method = req.method || "GET";
 
-  // Intercept POST /v1/responses → translate to /v1/chat/completions
-  if (method === "POST" && (url === "/v1/responses" || url.endsWith("/responses"))) {
+  // Intercept POST /responses or /v1/responses — pass through to Nosana at /v1/responses
+  // Nosana Qwen uses the OpenAI Responses API format at /v1/responses.
+  // ElizaOS plugin-openai calls OPENAI_BASE_URL + "/responses" (no /v1 prefix).
+  // We just add /v1 prefix and forward unchanged — no body transformation needed.
+  if (method === "POST" && (url === "/v1/responses" || url === "/responses" || url.endsWith("/responses"))) {
     try {
       const rawBody = await readBody(req);
-      const responsesReq = JSON.parse(rawBody);
-      const chatReq = responsesToChat(responsesReq);
+      const parsed = JSON.parse(rawBody);
 
       console.log(
-        `[LLM Proxy] /v1/responses → chat/completions | model=${responsesReq.model} | input=${responsesReq.input?.length}`
+        `[LLM Proxy] /responses passthrough → ${NOSANA_INFERENCE_URL}/v1/responses | model=${parsed.model}`
       );
 
       const ctrl = new AbortController();
       const tid = setTimeout(() => ctrl.abort(), 120000);
 
-      const upstream = await fetch(`${NOSANA_INFERENCE_URL}/v1/chat/completions`, {
+      const upstream = await fetch(`${NOSANA_INFERENCE_URL}/v1/responses`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${API_KEY}`,
         },
-        body: JSON.stringify(chatReq),
+        body: rawBody,
         signal: ctrl.signal,
       });
       clearTimeout(tid);
@@ -122,11 +124,8 @@ const server = createServer(async (req: IncomingMessage, res: ServerResponse) =>
         return;
       }
 
-      const chatResponse = JSON.parse(upstreamText);
-      const responsesResponse = chatToResponses(chatResponse);
-
       res.writeHead(200, { "Content-Type": "application/json" });
-      res.end(JSON.stringify(responsesResponse));
+      res.end(upstreamText);
     } catch (err: any) {
       const isTimeout = err?.name === "AbortError";
       console.error(`[LLM Proxy] Error: ${err.message}`);
@@ -136,34 +135,71 @@ const server = createServer(async (req: IncomingMessage, res: ServerResponse) =>
     return;
   }
 
-  // Also intercept POST /v1/chat/completions in case ElizaOS falls back to it —
-  // forward directly to Nosana without translation
-  if (method === "POST" && (url === "/v1/chat/completions" || url.endsWith("/chat/completions"))) {
+  // Also intercept POST /v1/chat/completions or /chat/completions —
+  // translate from Chat Completions to Responses API format for Nosana
+  if (method === "POST" && (url === "/v1/chat/completions" || url === "/chat/completions" || url.endsWith("/chat/completions"))) {
     try {
       const rawBody = await readBody(req);
       const chatReq = JSON.parse(rawBody);
 
+      // Convert chat/completions format → responses format
+      const messages: Array<{ role: string; content: string }> = chatReq.messages || [];
+      const systemMsg = messages.find((m) => m.role === "system");
+      const userMsgs = messages.filter((m) => m.role !== "system");
+
+      const responsesBody: any = {
+        model: chatReq.model,
+        input: userMsgs.map((m) => ({ role: m.role, content: m.content })),
+      };
+      if (systemMsg) responsesBody.instructions = systemMsg.content;
+      if (chatReq.max_tokens !== undefined) responsesBody.max_output_tokens = chatReq.max_tokens;
+      if (chatReq.temperature !== undefined) responsesBody.temperature = chatReq.temperature;
+
       console.log(
-        `[LLM Proxy] chat/completions passthrough | model=${chatReq.model} | msgs=${chatReq.messages?.length}`
+        `[LLM Proxy] chat/completions → /v1/responses | model=${chatReq.model} | msgs=${chatReq.messages?.length}`
       );
 
       const ctrl = new AbortController();
       const tid = setTimeout(() => ctrl.abort(), 120000);
 
-      const upstream = await fetch(`${NOSANA_INFERENCE_URL}/v1/chat/completions`, {
+      const upstream = await fetch(`${NOSANA_INFERENCE_URL}/v1/responses`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${API_KEY}`,
         },
-        body: rawBody,
+        body: JSON.stringify(responsesBody),
         signal: ctrl.signal,
       });
       clearTimeout(tid);
 
-      const data = await upstream.text();
-      res.writeHead(upstream.status, { "Content-Type": "application/json" });
-      res.end(data);
+      const upstreamText = await upstream.text();
+
+      if (!upstream.ok) {
+        console.error(`[LLM Proxy] Upstream error ${upstream.status}: ${upstreamText.slice(0, 200)}`);
+        res.writeHead(upstream.status, { "Content-Type": "application/json" });
+        res.end(upstreamText);
+        return;
+      }
+
+      // Convert Responses API response back to Chat Completions format
+      const responsesResp = JSON.parse(upstreamText);
+      const text = responsesResp.output?.[0]?.content?.[0]?.text || "";
+      const chatResp = {
+        id: responsesResp.id || `chatcmpl-${Date.now()}`,
+        object: "chat.completion",
+        created: responsesResp.created_at || Math.floor(Date.now() / 1000),
+        model: responsesResp.model || chatReq.model,
+        choices: [{ index: 0, message: { role: "assistant", content: text }, finish_reason: "stop" }],
+        usage: {
+          prompt_tokens: responsesResp.usage?.input_tokens || 0,
+          completion_tokens: responsesResp.usage?.output_tokens || 0,
+          total_tokens: responsesResp.usage?.total_tokens || 0,
+        },
+      };
+
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify(chatResp));
     } catch (err: any) {
       res.writeHead(502, { "Content-Type": "application/json" });
       res.end(JSON.stringify({ error: err.message }));
