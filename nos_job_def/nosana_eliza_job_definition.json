@@ -12,10 +12,10 @@
         "image": "ghcr.io/marchantdev/agent-challenge:latest",
         "expose": 8080,
         "env": {
-          "OPENAI_API_KEY": "YOUR_GROQ_API_KEY",
-          "OPENAI_BASE_URL": "https://api.groq.com/openai/v1",
-          "OPENAI_SMALL_MODEL": "llama-3.3-70b-versatile",
-          "OPENAI_LARGE_MODEL": "llama-3.3-70b-versatile",
+          "OPENAI_API_KEY": "nosana",
+          "OPENAI_BASE_URL": "REPLACE_WITH_NEW_NOSANA_ENDPOINT/v1",
+          "OPENAI_SMALL_MODEL": "Qwen3.5-27B-AWQ-4bit",
+          "OPENAI_LARGE_MODEL": "Qwen3.5-27B-AWQ-4bit",
           "SERVER_PORT": "3000",
           "FRONTEND_PORT": "8080",
           "NODE_ENV": "production"
