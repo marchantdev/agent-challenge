@@ -68,7 +68,7 @@ async function isAgentReady(): Promise<boolean> {
   try {
     const ctrl = new AbortController();
     const tid = setTimeout(() => ctrl.abort(), 2000);
-    const r = await fetch(`http://localhost:${AGENT_PORT}/agents`, { signal: ctrl.signal });
+    const r = await fetch(`http://localhost:${AGENT_PORT}/api/agents`, { signal: ctrl.signal });
     clearTimeout(tid);
     return r.ok;
   } catch {
