@@ -147,6 +147,17 @@ def send_message_and_wait(channel_id, server_id, text, timeout_secs=90):
     """Send a message to the channel and poll for agent reply. Returns reply text or None."""
     TEST_USER_ID = "00000000-0000-0000-0000-000000000001"
 
+    # Snapshot current agent message count BEFORE sending our message
+    prev_agent_count = 0
+    try:
+        r = requests.get(f"{BASE_URL}/api/messaging/central-channels/{channel_id}/messages?limit=50",
+            timeout=5)
+        if r.ok:
+            msgs_before = r.json().get("data", {}).get("messages", [])
+            prev_agent_count = sum(1 for m in msgs_before if m.get("authorId") != TEST_USER_ID)
+    except:
+        pass
+
     # Send message
     try:
         r = requests.post(f"{BASE_URL}/api/messaging/central-channels/{channel_id}/messages",
@@ -159,13 +170,11 @@ def send_message_and_wait(channel_id, server_id, text, timeout_secs=90):
             }, timeout=15)
         if not r.ok:
             return None
-        sent_id = r.json().get("userMessage", {}).get("id")
     except:
         return None
 
-    # Poll for reply
+    # Poll for a NEW reply (count must exceed prev_agent_count)
     deadline = time.time() + timeout_secs
-    last_count = 1  # We already have 1 message (ours)
     while time.time() < deadline:
         time.sleep(3)
         try:
@@ -175,8 +184,8 @@ def send_message_and_wait(channel_id, server_id, text, timeout_secs=90):
                 continue
             msgs = r.json().get("data", {}).get("messages", [])
             agent_msgs = [m for m in msgs if m.get("authorId") != TEST_USER_ID]
-            if agent_msgs:
-                # Return the most recent agent message
+            if len(agent_msgs) > prev_agent_count:
+                # Return the newest agent message (reply to our message)
                 return agent_msgs[-1].get("content", "")
         except:
             pass

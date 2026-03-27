@@ -82,8 +82,11 @@ async function callNosanaChat(
   const data = (await res.json()) as {
     choices?: Array<{ message?: { content?: string } }>;
   };
-  const text = data.choices?.[0]?.message?.content ?? "";
-  logger.debug(`[Axiom:LLM] reply length=${text.length}`);
+  const raw = data.choices?.[0]?.message?.content ?? "";
+  // Strip Qwen3 chain-of-thought <think>...</think> tokens so ElizaOS XML
+  // parsing receives a clean <response>...</response> block.
+  const text = raw.replace(/<think>[\s\S]*?<\/think>/g, "").trim();
+  logger.debug(`[Axiom:LLM] reply length=${text.length} (raw=${raw.length})`);
   return text;
 }
 
