@@ -71,17 +71,19 @@ def test_api():
 
 ACTIONS_TO_TEST = [
     # (description, message_text, expected_keyword)
-    ("ASSESS_PROTOCOL_RISK (AI)", "Assess the risk of Aave", "score"),
-    ("EXPLAIN_VULNERABILITY", "Explain flash loan attacks", "flash"),
-    ("SCAN_CONTRACT (ETH)", "Scan contract 0xBB9bc244D798123fDe783fCc1C72d3Bb8C189413", "contract"),
-    ("GET_PROTOCOL_TVL", "Get TVL for Uniswap", "tvl"),
-    ("GET_TOP_PROTOCOLS", "Show me the top 10 DeFi protocols", "protocol"),
-    ("MONITOR_PROTOCOL", "Monitor Compound protocol", "monitor"),
-    ("GET_EXPLOIT_HISTORY", "Get exploit history for DeFi protocols", "exploit"),
-    ("COMPARE_PROTOCOLS (AI)", "Compare Aave and Compound", "aave"),
-    ("GENERATE_AUDIT_REPORT (AI)", "Generate audit report for Uniswap", "audit"),
-    ("QUERY_NOSANA_NODES", "Query Nosana nodes", "nosana"),
-    ("QUERY_NOSANA_JOBS", "Show Nosana jobs", "job"),
+    # Covers all 12 registered plugin actions — one test per unique action
+    ("ASSESS_PROTOCOL_RISK (AI)", "Assess the risk of Aave", "score"),       # assessRiskAction
+    ("EXPLAIN_VULNERABILITY", "Explain flash loan attacks", "flash"),          # explainVulnAction
+    ("INSPECT_CONTRACT (ETH)", "Scan contract 0xBB9bc244D798123fDe783fCc1C72d3Bb8C189413", "contract"),  # inspectContractAction
+    ("SCAN_DEFI_TVL", "Get TVL for Uniswap", "tvl"),                          # scanTvlAction
+    ("ANALYZE_WALLET", "Analyze wallet 0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045", "wallet"),  # analyzeWalletAction
+    ("MONITOR_PROTOCOL", "Monitor Compound protocol", "monitor"),              # monitorProtocolAction
+    ("GET_EXPLOIT_HISTORY", "Get exploit history for DeFi protocols", "exploit"),  # exploitHistoryAction
+    ("COMPARE_PROTOCOLS (AI)", "Compare Aave and Compound", "aave"),          # compareProtocolsAction
+    ("GENERATE_AUDIT_REPORT (AI)", "Generate audit report for Uniswap", "audit"),  # generateAuditReportAction
+    ("NOSANA_STATUS", "Where do you run?", "nosana"),                         # nosanaStatusAction
+    ("SCAN_BOUNTIES", "Show me active bug bounty programs", "bounty"),        # scanBountiesAction
+    ("AUDIT_RECON", "Run audit recon on aave", "audit"),                      # auditReconAction
 ]
 
 def setup_channel():
