@@ -1,5 +1,5 @@
 # Stage 1: Build frontend
-FROM node:23-slim AS frontend-build
+FROM public.ecr.aws/docker/library/node:23-slim AS frontend-build
 WORKDIR /frontend
 COPY frontend/package.json ./
 RUN npm install
@@ -7,7 +7,7 @@ COPY frontend/ .
 RUN npm run build
 
 # Stage 2: ElizaOS agent
-FROM node:23-slim AS base
+FROM public.ecr.aws/docker/library/node:23-slim AS base
 
 # Install system dependencies + bun (required by elizaos CLI)
 RUN apt-get update && apt-get install -y \
