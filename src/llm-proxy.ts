@@ -174,7 +174,24 @@ const server = createServer(async (req: IncomingMessage, res: ServerResponse) =>
     return;
   }
 
-  // Pass all other requests (e.g. /v1/models) directly to the Nosana endpoint
+  // Intercept GET /v1/models — Nosana doesn't implement this endpoint, return static list
+  if (method === "GET" && (url === "/v1/models" || url === "/models")) {
+    res.writeHead(200, { "Content-Type": "application/json" });
+    res.end(JSON.stringify({
+      object: "list",
+      data: [
+        {
+          id: "Qwen3.5-27B-AWQ-4bit",
+          object: "model",
+          created: Math.floor(Date.now() / 1000),
+          owned_by: "nosana",
+        },
+      ],
+    }));
+    return;
+  }
+
+  // Pass all other requests directly to the Nosana endpoint
   try {
     const rawBody = await readBody(req);
     const ctrl = new AbortController();

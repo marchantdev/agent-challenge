@@ -58,6 +58,52 @@ else
       echo "[start.sh] ElizaOS running after 30s — OK" >> "$LOG_FILE"
     fi
   done
+
+  # Channel bootstrap — wait for ElizaOS REST API to be ready, then create default channel
+  echo "[start.sh] Waiting for ElizaOS API..." >> "$LOG_FILE"
+  READY=0
+  for j in $(seq 1 30); do
+    STATUS=$(bun -e "fetch('http://localhost:3000/api/agents').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))" 2>/dev/null; echo $?)
+    if [ "$STATUS" = "0" ]; then
+      READY=1
+      echo "[start.sh] ElizaOS API ready after $((j*2))s" >> "$LOG_FILE"
+      break
+    fi
+    sleep 2
+  done
+
+  if [ "$READY" = "1" ]; then
+    echo "[start.sh] Bootstrapping default channel..." >> "$LOG_FILE"
+    bun -e "
+const BASE = 'http://localhost:3000';
+const SYSTEM_USER = '00000000-0000-0000-0000-000000000001';
+async function bootstrap() {
+  const agentsData = await fetch(BASE+'/api/agents').then(r=>r.json()).catch(()=>({}));
+  const agents = agentsData?.data?.agents || [];
+  if (!agents.length) { console.log('[bootstrap] no agents'); return; }
+  const agentId = agents[0].id;
+  const serversData = await fetch(BASE+'/api/messaging/message-servers').then(r=>r.json()).catch(()=>({}));
+  const servers = serversData?.data?.messageServers || [];
+  if (!servers.length) { console.log('[bootstrap] no message servers'); return; }
+  const serverId = servers[0].id;
+  const chanData = await fetch(BASE+'/api/messaging/central-channels', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({name:'General',message_server_id:serverId,participantCentralUserIds:[SYSTEM_USER],type:'GROUP'}),
+  }).then(r=>r.json()).catch(()=>({}));
+  const channelId = chanData?.data?.id;
+  if (!channelId) { console.log('[bootstrap] channel create failed:', JSON.stringify(chanData)); return; }
+  await fetch(BASE+'/api/messaging/central-channels/'+channelId+'/agents', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({agentId}),
+  }).catch(()=>{});
+  console.log('[bootstrap] channel ready:', channelId);
+}
+bootstrap().catch(e=>console.error('[bootstrap] error:', e.message));
+" >> "$LOG_FILE" 2>&1
+    echo "[start.sh] Bootstrap complete" >> "$LOG_FILE"
+  else
+    echo "[start.sh] ElizaOS API not ready after 60s — skipping bootstrap" >> "$LOG_FILE"
+  fi
 fi
 
 # Keep alive
