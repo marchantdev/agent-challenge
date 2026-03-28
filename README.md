@@ -1,6 +1,6 @@
-# Axiom — Decentralized DeFi Security Operations Center
+# Axiom — Your Personal DeFi Security Analyst
 
-> Security infrastructure that's as decentralized as the protocols it protects. Powered by Nosana + ElizaOS.
+> Your AI-powered DeFi security analyst, running on your own decentralized GPU. Monitors your protocols, alerts you to risks, keeps your data private. Built with ElizaOS v2 on Nosana.
 
 ![Nosana x ElizaOS](NosanaXEliza.jpg)
 
@@ -315,17 +315,17 @@ nosana job post \
 
 ---
 
-## Why Decentralized Security Infrastructure?
+## Why a Personal Security Agent?
 
-Security tooling running on centralized cloud has a single point of failure. If the provider is compromised, rate-limits your API, or censors your analysis — the tool stops working.
+If you trust DeFi protocols with your money, you should not have to trust a centralized service to tell you if they are safe. Axiom gives you your own security analyst — running on your own GPU, keeping your analysis private.
 
-Axiom runs on Nosana's decentralized GPU network — a Solana-based compute marketplace of independent node operators. This provides:
+Axiom runs on Nosana's decentralized GPU network — a Solana-based compute marketplace. This means:
 
-- **Censorship resistance** — No single entity can shut down or restrict security analysis
-- **Trust minimization** — No centralized infrastructure to compromise
-- **Always available** — GPU compute sourced from a marketplace; if one node goes down, jobs migrate
+- **Your data stays private** — Analysis runs on your Nosana node, not a centralized API that logs your queries
+- **Censorship resistant** — No single entity can restrict your security analysis
+- **Always yours** — Your agent, your infrastructure, your watchlist, your Security Scores
 
-> The same trustless ethos as the DeFi protocols it protects.
+> Inspired by OpenClaw: your AI, your data, your control.
 
 ---
 
