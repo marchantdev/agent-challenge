@@ -1,72 +1,79 @@
 #!/bin/sh
-# Axiom startup script — debug version
+# Axiom startup script
 LOG_FILE="/tmp/elizaos.log"
-echo "[start.sh] === Axiom Container Starting ===" > "$LOG_FILE"
-echo "[start.sh] Date: $(date)" >> "$LOG_FILE"
-echo "[start.sh] OPENAI_BASE_URL=$OPENAI_BASE_URL" >> "$LOG_FILE"
-echo "[start.sh] NOSANA_INFERENCE_URL=$NOSANA_INFERENCE_URL" >> "$LOG_FILE"
 
-export PATH="/app/node_modules/.bin:$PATH"
+# Ensure bun and node_modules bins are in PATH (Nosana may not preserve Docker ENV)
+export BUN_INSTALL="${BUN_INSTALL:-/root/.bun}"
+export PATH="$BUN_INSTALL/bin:/app/node_modules/.bin:$PATH"
 
-echo "[start.sh] Starting frontend server..." >> "$LOG_FILE"
-node /app/dist/server.js &
+log() { echo "[start.sh] $*" | tee -a "$LOG_FILE"; }
+
+log "=== Axiom Container Starting ==="
+log "Date: $(date)"
+log "OPENAI_BASE_URL=$OPENAI_BASE_URL"
+log "NOSANA_INFERENCE_URL=$NOSANA_INFERENCE_URL"
+log "bun: $(which bun 2>/dev/null || echo NOT_FOUND)"
+log "node: $(which node 2>/dev/null || echo NOT_FOUND)"
+log "elizaos: $(which elizaos 2>/dev/null || echo NOT_FOUND)"
+
+log "Starting frontend server..."
+node /app/dist/server.js 2>&1 | tee -a "$LOG_FILE" &
 SERVER_PID=$!
 sleep 3
-echo "[start.sh] Frontend PID=$SERVER_PID" >> "$LOG_FILE"
+log "Frontend PID=$SERVER_PID (running=$(kill -0 $SERVER_PID 2>/dev/null && echo yes || echo no))"
 
-# LLM Proxy
+# LLM Proxy — intercepts OPENAI_BASE_URL and routes to Nosana node
 if [ -n "$OPENAI_BASE_URL" ]; then
   NOSANA_BASE=$(echo "$OPENAI_BASE_URL" | sed 's|/v1/*$||')
   export NOSANA_INFERENCE_URL="$NOSANA_BASE"
   export OPENAI_BASE_URL="http://localhost:4001"
   export LLM_PROXY_PORT="4001"
-  echo "[start.sh] LLM proxy -> $NOSANA_BASE" >> "$LOG_FILE"
-  node /app/dist/llm-proxy.js >> "$LOG_FILE" 2>&1 &
+  log "LLM proxy -> $NOSANA_BASE"
+  node /app/dist/llm-proxy.js 2>&1 | tee -a "$LOG_FILE" &
   sleep 2
 fi
 
-# ElizaOS — capture everything
-echo "[start.sh] === ElizaOS Launch ===" >> "$LOG_FILE"
-echo "[start.sh] OPENAI_BASE_URL=$OPENAI_BASE_URL" >> "$LOG_FILE"
-echo "[start.sh] which elizaos: $(which elizaos)" >> "$LOG_FILE"
-echo "[start.sh] plugin.js: $(ls -la /app/dist/plugin.js 2>&1)" >> "$LOG_FILE"
-echo "[start.sh] character: $(ls -la /app/characters/agent.character.json 2>&1)" >> "$LOG_FILE"
+# ElizaOS — use bun explicitly (elizaos binary is a bun script)
+log "=== ElizaOS Launch ==="
+log "OPENAI_BASE_URL=$OPENAI_BASE_URL"
+log "plugin.js: $(ls -la /app/dist/plugin.js 2>&1)"
+log "character: $(ls -la /app/characters/agent.character.json 2>&1)"
+log "node_modules/@elizaos/core: $(ls /app/node_modules/@elizaos/core/package.json 2>/dev/null && echo OK || echo MISSING)"
 
-# Run elizaos and capture exit
-elizaos start --character /app/characters/agent.character.json >> "$LOG_FILE" 2>&1 &
-ELIZAOS_PID=$!
-echo "[start.sh] ElizaOS PID=$ELIZAOS_PID" >> "$LOG_FILE"
+start_elizaos() {
+  local attempt="$1"
+  log "Starting ElizaOS (attempt $attempt) with bun..."
+  bun /app/node_modules/.bin/elizaos start \
+    --character /app/characters/agent.character.json 2>&1 | tee -a "$LOG_FILE" &
+  echo $!
+}
 
-# Monitor every 2s
+ELIZAOS_PID=$(start_elizaos 1)
+log "ElizaOS PID=$ELIZAOS_PID"
+
+# Monitor for 120s — restart up to 2 times if it crashes
+attempts=1
 i=0
-while [ $i -lt 30 ]; do
+while [ $i -lt 60 ]; do
   sleep 2
   i=$((i + 1))
   if ! kill -0 $ELIZAOS_PID 2>/dev/null; then
     wait $ELIZAOS_PID 2>/dev/null
     EC=$?
-    echo "[start.sh] !! ElizaOS EXITED after $((i*2))s — exit code $EC !!" >> "$LOG_FILE"
-    # Try running with node directly to see error
-    echo "[start.sh] === Retry with node directly ===" >> "$LOG_FILE"
-    ELIZAOS_BIN=$(readlink -f /app/node_modules/.bin/elizaos 2>/dev/null || echo "/app/node_modules/.bin/elizaos")
-    echo "[start.sh] elizaos resolves to: $ELIZAOS_BIN" >> "$LOG_FILE"
-    ls -la "$ELIZAOS_BIN" >> "$LOG_FILE" 2>&1
-    file "$ELIZAOS_BIN" >> "$LOG_FILE" 2>&1
-    # Try running it
-    node "$ELIZAOS_BIN" start --character /app/characters/agent.character.json >> "$LOG_FILE" 2>&1 &
-    RETRY_PID=$!
-    sleep 15
-    if kill -0 $RETRY_PID 2>/dev/null; then
-      echo "[start.sh] Retry running OK — keeping alive" >> "$LOG_FILE"
-      ELIZAOS_PID=$RETRY_PID
+    log "!! ElizaOS EXITED after $((i*2))s — exit code $EC !!"
+    if [ $attempts -lt 3 ]; then
+      attempts=$((attempts + 1))
+      log "Restarting ElizaOS (attempt $attempts)..."
+      sleep 5
+      ELIZAOS_PID=$(start_elizaos $attempts)
+      log "New ElizaOS PID=$ELIZAOS_PID"
     else
-      wait $RETRY_PID 2>/dev/null
-      echo "[start.sh] Retry also failed with code $?" >> "$LOG_FILE"
+      log "ElizaOS failed 3 times — giving up. Container stays alive for server."
+      break
     fi
-    break
   fi
-  if [ $i -eq 15 ]; then
-    echo "[start.sh] ElizaOS running after 30s — OK" >> "$LOG_FILE"
+  if [ $i -eq 20 ]; then
+    log "ElizaOS running after 40s — OK"
   fi
 done
 
