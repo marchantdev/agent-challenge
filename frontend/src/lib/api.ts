@@ -227,15 +227,29 @@ async function getOrCreateChannel(agentId: string): Promise<{ channelId: string;
   if (servers.length === 0) throw new Error("No message servers");
   const serverId = servers[0].id;
 
-  // Create channel
-  const chanRes = await fetch(`${AGENT_BASE}/messaging/central-channels`, {
+  // First: look for existing channels (the bootstrapped channel has the agent already added)
+  try {
+    const listRes = await fetch(`${AGENT_BASE}/messaging/message-servers/${serverId}/channels`, { signal: AbortSignal.timeout(5000) });
+    if (listRes.ok) {
+      const listData = await listRes.json();
+      const channels: any[] = listData.data?.channels ?? listData.channels ?? [];
+      if (channels.length > 0) {
+        cachedChannelId = channels[0].id;
+        cachedServerId = serverId;
+        return { channelId: cachedChannelId!, serverId };
+      }
+    }
+  } catch { /* fall through to create */ }
+
+  // No existing channels — create one with BOTH user and agent as participants
+  const chanRes = await fetch(`${AGENT_BASE}/messaging/channels`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     signal: AbortSignal.timeout(8000),
     body: JSON.stringify({
       name: "axiom-dashboard",
       message_server_id: serverId,
-      participantCentralUserIds: [TEST_USER_ID],
+      participantCentralUserIds: [TEST_USER_ID, agentId],
       type: "GROUP",
       metadata: { dashboard: true },
     }),
@@ -243,15 +257,6 @@ async function getOrCreateChannel(agentId: string): Promise<{ channelId: string;
   if (!chanRes.ok) throw new Error(`Channel creation failed: ${chanRes.status}`);
   const chanData = await chanRes.json();
   const channelId = chanData.data?.id ?? chanData.id;
-
-  // Add agent to channel
-  try {
-    await fetch(`${AGENT_BASE}/messaging/central-channels/${channelId}/agents`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ agentId }),
-    });
-  } catch { /* non-fatal */ }
 
   cachedChannelId = channelId;
   cachedServerId = serverId;
