@@ -47,7 +47,8 @@ function responsesToChat(body: any): any {
   };
 
   if (body.temperature !== undefined) req.temperature = body.temperature;
-  if (body.max_output_tokens !== undefined) req.max_tokens = body.max_output_tokens;
+  // Cap max tokens for faster responses — 27B model on 3090 is slow
+  req.max_tokens = Math.min(body.max_output_tokens || 800, 800);
   if (body.stream) req.stream = body.stream;
 
   return req;

@@ -98,10 +98,22 @@ async function proxyToAgent(req: IncomingMessage, res: ServerResponse): Promise<
     const data = await proxyRes.text();
     totalResponseTime += Date.now() - start;
 
-    // Track action calls
-    if (req.url?.includes("/message")) {
+    // Track action calls — match ElizaOS v1.7 messaging paths
+    if (req.url?.includes("/messages") || req.url?.includes("/message")) {
       try {
         const parsed = JSON.parse(data);
+        // v1.7 format: {success, userMessage} for POST, {success, data: {messages}} for GET
+        if (parsed?.userMessage?.content) {
+          actionCounts["_messages_sent"] = (actionCounts["_messages_sent"] || 0) + 1;
+        }
+        if (parsed?.data?.messages && Array.isArray(parsed.data.messages)) {
+          for (const m of parsed.data.messages) {
+            if (m.metadata?.action) {
+              actionCounts[m.metadata.action] = (actionCounts[m.metadata.action] || 0) + 1;
+            }
+          }
+        }
+        // Also handle legacy array format
         if (Array.isArray(parsed)) {
           parsed.forEach((m: any) => {
             if (m.action) actionCounts[m.action] = (actionCounts[m.action] || 0) + 1;

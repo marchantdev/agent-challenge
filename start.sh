@@ -74,33 +74,66 @@ else
 
   if [ "$READY" = "1" ]; then
     echo "[start.sh] Bootstrapping default channel..." >> "$LOG_FILE"
-    bun -e "
+    BOOTSTRAP_RESULT=$(bun -e "
 const BASE = 'http://localhost:3000';
 const SYSTEM_USER = '00000000-0000-0000-0000-000000000001';
 async function bootstrap() {
   const agentsData = await fetch(BASE+'/api/agents').then(r=>r.json()).catch(()=>({}));
   const agents = agentsData?.data?.agents || [];
-  if (!agents.length) { console.log('[bootstrap] no agents'); return; }
+  if (!agents.length) { console.error('[bootstrap] no agents'); return; }
   const agentId = agents[0].id;
   const serversData = await fetch(BASE+'/api/messaging/message-servers').then(r=>r.json()).catch(()=>({}));
   const servers = serversData?.data?.messageServers || [];
-  if (!servers.length) { console.log('[bootstrap] no message servers'); return; }
+  if (!servers.length) { console.error('[bootstrap] no message servers'); return; }
   const serverId = servers[0].id;
   const chanData = await fetch(BASE+'/api/messaging/central-channels', {
     method:'POST', headers:{'Content-Type':'application/json'},
     body: JSON.stringify({name:'General',message_server_id:serverId,participantCentralUserIds:[SYSTEM_USER],type:'GROUP'}),
   }).then(r=>r.json()).catch(()=>({}));
   const channelId = chanData?.data?.id;
-  if (!channelId) { console.log('[bootstrap] channel create failed:', JSON.stringify(chanData)); return; }
+  if (!channelId) { console.error('[bootstrap] channel create failed:', JSON.stringify(chanData)); return; }
   await fetch(BASE+'/api/messaging/central-channels/'+channelId+'/agents', {
     method:'POST', headers:{'Content-Type':'application/json'},
     body: JSON.stringify({agentId}),
   }).catch(()=>{});
-  console.log('[bootstrap] channel ready:', channelId);
+  console.error('[bootstrap] channel ready:', channelId);
+  // Output channel and server IDs on stdout for shell to capture
+  console.log(channelId + ' ' + serverId);
 }
 bootstrap().catch(e=>console.error('[bootstrap] error:', e.message));
-" >> "$LOG_FILE" 2>&1
-    echo "[start.sh] Bootstrap complete" >> "$LOG_FILE"
+" 2>> "$LOG_FILE")
+    BOOT_CHANNEL=$(echo "$BOOTSTRAP_RESULT" | awk '{print $1}')
+    BOOT_SERVER=$(echo "$BOOTSTRAP_RESULT" | awk '{print $2}')
+    echo "[start.sh] Bootstrap complete — channel=$BOOT_CHANNEL server=$BOOT_SERVER" >> "$LOG_FILE"
+
+    # Pre-warm suggestion chip queries (fire and forget — responses arrive in background)
+    if [ -n "$BOOT_CHANNEL" ]; then
+      echo "[start.sh] Pre-warming suggestion queries..." >> "$LOG_FILE"
+      bun -e "
+const BASE = 'http://localhost:3000';
+const CH = process.argv[1];
+const SRV = process.argv[2];
+const USER = '00000000-0000-0000-0000-000000000001';
+const queries = [
+  'Assess Aave V3 risk',
+  'Top DeFi protocols by TVL',
+  'Explain flash loan attacks',
+];
+async function prewarm() {
+  for (const q of queries) {
+    try {
+      await fetch(BASE+'/api/messaging/central-channels/'+CH+'/messages', {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({author_id:USER, content:q, message_server_id:SRV}),
+      });
+      console.log('[prewarm] sent:', q);
+    } catch(e) { console.log('[prewarm] error:', e.message); }
+  }
+}
+prewarm();
+" "$BOOT_CHANNEL" "$BOOT_SERVER" >> "$LOG_FILE" 2>&1 &
+      echo "[start.sh] Pre-warm started in background" >> "$LOG_FILE"
+    fi
   else
     echo "[start.sh] ElizaOS API not ready after 60s — skipping bootstrap" >> "$LOG_FILE"
   fi

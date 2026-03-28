@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from "react";
 import type { ChatMessage } from "../lib/types";
-import { sendMessage } from "../lib/api";
+import { sendMessage, fetchProtocols, detectAnomalies, formatUsd } from "../lib/api";
 import { renderMarkdown } from "../lib/markdown";
 import { ChainBadge } from "./ChainBadge";
 import SecurityGauge, { parseSecurityScore, parseCompareScores } from "./SecurityGauge";
@@ -100,6 +100,42 @@ export default function Chat() {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
+  // Morning briefing — proactive anomaly report on load
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const protocols = await fetchProtocols();
+        if (cancelled) return;
+        const anomalies = detectAnomalies(protocols);
+        const totalTvl = protocols.reduce((s, p) => s + p.tvl, 0);
+        const hour = new Date().getHours();
+        const greeting = hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
+
+        let briefing = `**${greeting}. Live security briefing:**\n\n`;
+        briefing += `Monitoring **${protocols.length} protocols** with combined TVL of **${formatUsd(totalTvl)}**.\n\n`;
+
+        if (anomalies.length > 0) {
+          briefing += `**⚠ ${anomalies.length} anomal${anomalies.length === 1 ? "y" : "ies"} detected:**\n`;
+          for (const a of anomalies.slice(0, 5)) {
+            const change = a.change_1d !== null ? `${a.change_1d.toFixed(1)}% (24h)` : `${a.change_7d?.toFixed(1)}% (7d)`;
+            briefing += `- **${a.name}** — TVL ${formatUsd(a.tvl)}, ${change}\n`;
+          }
+          if (anomalies.length > 5) briefing += `- ...and ${anomalies.length - 5} more\n`;
+          briefing += `\nClick **"Assess Aave V3 risk"** below for a deep-dive, or ask me anything.`;
+        } else {
+          briefing += `No anomalies detected. All clear. Ask me about any protocol to investigate.`;
+        }
+
+        setMessages((m) => [
+          ...m,
+          { id: "briefing", role: "agent" as const, text: briefing, timestamp: Date.now() },
+        ]);
+      } catch { /* silent — briefing is optional */ }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
   const send = async (text?: string) => {
     const msg = (text || input).trim();
     if (!msg || loading) return;
@@ -133,14 +169,17 @@ export default function Chat() {
         ))}
         {loading && (
           <div className="flex justify-start">
-            <div className="bg-zinc-800/80 border border-zinc-700 rounded-lg px-4 py-3">
-              <div className="flex items-center gap-2">
+            <div className="bg-zinc-800/80 border border-zinc-700 rounded-lg px-4 py-3 max-w-[80%]">
+              <div className="flex items-center gap-1.5 mb-2">
                 <span className="w-5 h-5 rounded bg-emerald-600 flex items-center justify-center text-[10px] font-bold text-white">A</span>
-                <div className="flex gap-1 text-zinc-400 text-sm">
-                  <span>Analyzing</span>
-                  <span className="animate-bounce" style={{ animationDelay: "0ms" }}>.</span>
-                  <span className="animate-bounce" style={{ animationDelay: "150ms" }}>.</span>
-                  <span className="animate-bounce" style={{ animationDelay: "300ms" }}>.</span>
+                <span className="text-[10px] text-emerald-400 font-semibold tracking-wide">AXIOM</span>
+              </div>
+              <div className="flex items-center gap-3 text-zinc-400 text-sm">
+                <div className="w-4 h-4 border-2 border-emerald-500/30 border-t-emerald-500 rounded-full animate-spin" />
+                <div className="space-y-1">
+                  <p className="text-zinc-300">Analyzing your query...</p>
+                  <p className="text-[11px] text-zinc-500">Fetching live data from DefiLlama, Etherscan &amp; rekt.news</p>
+                  <p className="text-[10px] text-zinc-600">Inference: Qwen3.5-27B on Nosana GPU — this may take up to 60s</p>
                 </div>
               </div>
             </div>
