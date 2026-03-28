@@ -210,7 +210,7 @@ async function getAgentId(): Promise<string> {
   const res = await fetch(`${AGENT_BASE}/agents`, { signal: AbortSignal.timeout(5000) });
   if (!res.ok) throw new Error(`/api/agents returned ${res.status}`);
   const data = await res.json();
-  const agents: any[] = data.agents ?? data.data ?? (Array.isArray(data) ? data : []);
+  const agents: any[] = data.data?.agents ?? data.agents ?? (Array.isArray(data.data) ? data.data : []);
   if (agents.length === 0) throw new Error("No agents running");
   cachedAgentId = agents[0].id ?? agents[0].agentId;
   return cachedAgentId!;
