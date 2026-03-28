@@ -191,6 +191,38 @@ const server = createServer(async (req: IncomingMessage, res: ServerResponse) =>
     return;
   }
 
+  // Handle /v1/embeddings — return dummy embeddings (Nosana doesn't serve embeddings)
+  // Without this, ElizaOS embedding service gets stuck in a 404 retry loop and blocks all message processing
+  if (method === "POST" && (url === "/v1/embeddings" || url.endsWith("/embeddings"))) {
+    try {
+      const rawBody = await readBody(req);
+      const body = JSON.parse(rawBody);
+      const inputs = Array.isArray(body.input) ? body.input : [body.input || ""];
+
+      console.log(`[LLM Proxy] /v1/embeddings — returning dummy embeddings for ${inputs.length} input(s)`);
+
+      const dummyEmbedding = Array.from({ length: 1536 }, (_, i) => Math.sin(i * 0.01) * 0.1);
+
+      const response = {
+        object: "list",
+        data: inputs.map((_: string, idx: number) => ({
+          object: "embedding",
+          index: idx,
+          embedding: dummyEmbedding,
+        })),
+        model: body.model || "text-embedding-dummy",
+        usage: { prompt_tokens: 0, total_tokens: 0 },
+      };
+
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify(response));
+    } catch (err: any) {
+      res.writeHead(500, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: err.message }));
+    }
+    return;
+  }
+
   // Pass all other requests directly to the Nosana endpoint
   try {
     const rawBody = await readBody(req);
