@@ -207,7 +207,7 @@ const TEST_USER_ID = "11111111-1111-1111-1111-111111111111";
 
 async function getAgentId(): Promise<string> {
   if (cachedAgentId) return cachedAgentId;
-  const res = await fetch(`${AGENT_BASE}/agents`, { signal: AbortSignal.timeout(5000) });
+  const res = await fetch(`${AGENT_BASE}/agents`, { signal: AbortSignal.timeout(1500) });
   if (!res.ok) throw new Error(`/api/agents returned ${res.status}`);
   const data = await res.json();
   const agents: any[] = data.data?.agents ?? data.agents ?? (Array.isArray(data.data) ? data.data : []);
@@ -220,7 +220,7 @@ async function getOrCreateChannel(agentId: string): Promise<{ channelId: string;
   if (cachedChannelId && cachedServerId) return { channelId: cachedChannelId, serverId: cachedServerId };
 
   // Get message server
-  const serversRes = await fetch(`${AGENT_BASE}/messaging/message-servers`, { signal: AbortSignal.timeout(5000) });
+  const serversRes = await fetch(`${AGENT_BASE}/messaging/message-servers`, { signal: AbortSignal.timeout(1500) });
   if (!serversRes.ok) throw new Error(`/api/messaging/message-servers returned ${serversRes.status}`);
   const serversData = await serversRes.json();
   const servers: any[] = serversData.data?.messageServers ?? serversData.messageServers ?? (Array.isArray(serversData.data) ? serversData.data : []);
@@ -229,7 +229,7 @@ async function getOrCreateChannel(agentId: string): Promise<{ channelId: string;
 
   // First: look for existing channels (the bootstrapped channel has the agent already added)
   try {
-    const listRes = await fetch(`${AGENT_BASE}/messaging/message-servers/${serverId}/channels`, { signal: AbortSignal.timeout(5000) });
+    const listRes = await fetch(`${AGENT_BASE}/messaging/message-servers/${serverId}/channels`, { signal: AbortSignal.timeout(1500) });
     if (listRes.ok) {
       const listData = await listRes.json();
       const channels: any[] = listData.data?.channels ?? listData.channels ?? [];
@@ -311,7 +311,7 @@ export async function sendMessage(_agentId: string, text: string): Promise<strin
       await new Promise((r) => setTimeout(r, 1500));
       try {
         const pollRes = await fetch(`${AGENT_BASE}/messaging/central-channels/${channelId}/messages?limit=20`, {
-          signal: AbortSignal.timeout(5000),
+          signal: AbortSignal.timeout(1500),
         });
         if (!pollRes.ok) continue;
         const pollData = await pollRes.json();
@@ -396,7 +396,7 @@ export async function fetchEvaluatorStats(): Promise<EvaluatorStats> {
 export async function fetchNosanaNetwork(): Promise<NosanaNetwork> {
   // Try the Nosana dashboard API first
   try {
-    const res = await fetch("https://dashboard.nosana.com/api/nodes", { signal: AbortSignal.timeout(5000) });
+    const res = await fetch("https://dashboard.nosana.com/api/nodes", { signal: AbortSignal.timeout(1500) });
     if (!res.ok) throw new Error("Nosana API unavailable");
     const data = await res.json();
     const nodes = Array.isArray(data) ? data : data.nodes || [];
