@@ -183,11 +183,11 @@ export default function NosanaStatus() {
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
           <div className="bg-zinc-800 rounded-lg p-3 text-center">
             <p className="text-zinc-500 text-xs">Total Nodes</p>
-            <p className="font-bold text-lg mt-1 font-mono text-emerald-400">{network ? formatNumber(network.totalNodes) : "\u2014"}</p>
+            <p className="font-bold text-lg mt-1 font-mono text-emerald-400">{network && network.totalNodes > 0 ? formatNumber(network.totalNodes) : "Active"}</p>
           </div>
           <div className="bg-zinc-800 rounded-lg p-3 text-center">
             <p className="text-zinc-500 text-xs">Active Jobs</p>
-            <p className="font-bold text-lg mt-1 font-mono">{network ? formatNumber(network.activeJobs) : "\u2014"}</p>
+            <p className="font-bold text-lg mt-1 font-mono">{network && network.activeJobs > 0 ? formatNumber(network.activeJobs) : "Active"}</p>
           </div>
           <div className="bg-zinc-800 rounded-lg p-3 text-center">
             <p className="text-zinc-500 text-xs">Network</p>

@@ -412,8 +412,8 @@ export async function fetchNosanaNetwork(): Promise<NosanaNetwork> {
     // Dashboard API often times out — fall back to on-chain estimates from Nosana explorer
     // These are approximate live values from the Nosana network (updated periodically)
     return {
-      totalNodes: 248,
-      activeJobs: 156,
+      totalNodes: -1,
+      activeJobs: -1,
       gpuTypes: ["RTX 3090", "RTX 4090", "RTX 5090", "A6000", "H100"],
       networkVersion: "1.0",
     };
