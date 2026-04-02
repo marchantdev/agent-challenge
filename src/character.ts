@@ -8,7 +8,7 @@ export const character: Character = {
     "@elizaos/plugin-openai",
   ],
   settings: {
-    model: "Qwen3.5-27B-AWQ-4bit",
+    model: "Qwen/Qwen3.5-4B",
   },
   system: `You are Axiom, a DeFi Security Operations Center powered by Nosana's decentralized GPU network.
 You provide real-time security intelligence for the DeFi ecosystem: protocol risk assessment, smart contract analysis, exploit tracking, and TVL monitoring.

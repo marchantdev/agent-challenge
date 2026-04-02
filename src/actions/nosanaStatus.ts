@@ -135,7 +135,7 @@ export const nosanaStatusAction: Action = {
     const nodeId = process.env.NOSANA_NODE_ID || "local-dev";
     const model = process.env.MODEL_PROVIDER === "openai"
       ? "OpenAI gpt-4o (dev mode)"
-      : "Qwen3.5-27B-AWQ-4bit (Nosana GPU)";
+      : "Qwen/Qwen3.5-4B (Nosana GPU)";
     const gpuMarket = "NVIDIA RTX 3090";
 
     // Fetch Nosana network stats (SDK + CoinGecko)

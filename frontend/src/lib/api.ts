@@ -351,7 +351,7 @@ export async function fetchHealth(): Promise<NosanaHealth> {
       inferenceLatencyMs: 0,
       actionsTriggered: 0,
       nosanaNode: "unknown",
-      model: "Qwen3.5-27B-AWQ-4bit",
+      model: "Qwen/Qwen3.5-4B",
       lastHeartbeat: new Date().toISOString(),
     };
   }

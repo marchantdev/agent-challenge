@@ -10,7 +10,7 @@
  *   2. Fetches the DeFiLlama hacks database (cached for 1 hour) and filters
  *      for exploits whose technique matches the detected vulnerability type.
  *   3. Passes the filtered real-world examples plus the detected type to
- *      `runtime.useModel` (Qwen3.5-27B-AWQ-4bit running on Nosana GPU).
+ *      `runtime.useModel` (Qwen/Qwen3.5-4B running on Nosana GPU).
  *   4. The LLM generates a comprehensive briefing covering: attack mechanism,
  *      real recent examples, a vulnerable Solidity code snippet, and mitigations.
  *   5. Falls back to a structured list of verified exploits if LLM is unavailable.

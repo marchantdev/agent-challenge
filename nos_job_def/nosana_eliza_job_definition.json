@@ -13,10 +13,14 @@
         "expose": 8080,
         "env": {
           "OPENAI_API_KEY": "nosana",
-          "OPENAI_BASE_URL": "https://3gsrmj6gchzyws9bnc835apd4fh6t5tyeppmbxmzrzhn.node.k8s.prd.nos.ci/v1",
-          "NOSANA_INFERENCE_URL": "https://3gsrmj6gchzyws9bnc835apd4fh6t5tyeppmbxmzrzhn.node.k8s.prd.nos.ci/v1",
-          "OPENAI_SMALL_MODEL": "Qwen3.5-27B-AWQ-4bit",
-          "OPENAI_LARGE_MODEL": "Qwen3.5-27B-AWQ-4bit",
+          "OPENAI_BASE_URL": "https://4ksj3tve5bazqwkuyqdhwdpcar4yutcuxphwhckrdxmu.node.k8s.prd.nos.ci/v1",
+          "NOSANA_INFERENCE_URL": "https://4ksj3tve5bazqwkuyqdhwdpcar4yutcuxphwhckrdxmu.node.k8s.prd.nos.ci/v1",
+          "OPENAI_SMALL_MODEL": "Qwen/Qwen3.5-4B",
+          "OPENAI_LARGE_MODEL": "Qwen/Qwen3.5-4B",
+          "OPENAI_EMBEDDING_URL": "https://4yiccatpyxx773jtewo5ccwhw1s2hezq5pehndb6fcfq.node.k8s.prd.nos.ci/v1",
+          "OPENAI_EMBEDDING_API_KEY": "nosana",
+          "OPENAI_EMBEDDING_MODEL": "Qwen3-Embedding-0.6B",
+          "OPENAI_EMBEDDING_DIMENSIONS": "1024",
           "SERVER_PORT": "3000",
           "FRONTEND_PORT": "8080",
           "NODE_ENV": "production"

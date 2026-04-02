@@ -50,7 +50,7 @@
 │  │             │    │  │   CoinGecko ←── NOS price  │  │  │
 │  └─────────────┘    │  └─────────────────────────┘  │  │
 │                     │                                │  │
-│                     │  Model: Qwen3.5-27B-AWQ-4bit   │  │
+│                     │  Model: Qwen/Qwen3.5-4B   │  │
 │                     └──────────────────────────────┘  │
 └───────────────────────────────────────────────────────┘
 ```
@@ -107,7 +107,7 @@ Axiom operates across **Ethereum** and **Solana** natively:
 
 ### Nosana Integration
 
-- **Configured for Nosana GPU inference** (Qwen3.5-27B-AWQ-4bit on NVIDIA RTX 3090)
+- **Configured for Nosana GPU inference** (Qwen/Qwen3.5-4B on Nosana GPU)
 - **Nosana SDK** — Uses `@nosana/sdk` `Client` to query node and job counts directly from Solana on-chain data
 - **Health endpoints** — `/api/health` and `/api/metrics` serving real operational data
 - **Network awareness** — Agent reports NOS token price (CoinGecko), node count, and active jobs
@@ -123,7 +123,7 @@ GET /api/health
   "inferenceLatencyMs": 342,
   "actionsTriggered": 1847,
   "nosanaNode": "4HXAjRna...",
-  "model": "Qwen3.5-27B-AWQ-4bit"
+  "model": "Qwen/Qwen3.5-4B"
 }
 
 GET /api/metrics
@@ -341,7 +341,7 @@ Axiom runs on Nosana's decentralized GPU network — a Solana-based compute mark
 | Layer | Technology |
 |-------|-----------|
 | Agent Framework | ElizaOS v2 |
-| LLM | Qwen3.5-27B-AWQ-4bit (via Nosana GPU) |
+| LLM | Qwen/Qwen3.5-4B (via Nosana GPU) |
 | Frontend | React 19 + Vite 6 + TypeScript + Tailwind CSS |
 | Compute | Nosana decentralized GPU (RTX 3090) |
 | Nosana SDK | `@nosana/sdk` for on-chain node/job queries |

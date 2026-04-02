@@ -101,8 +101,8 @@ function msgs(
   return out;
 }
 
-const SMALL_MODEL = () => process.env.OPENAI_SMALL_MODEL || "Qwen3.5-27B-AWQ-4bit";
-const LARGE_MODEL = () => process.env.OPENAI_LARGE_MODEL || "Qwen3.5-27B-AWQ-4bit";
+const SMALL_MODEL = () => process.env.OPENAI_SMALL_MODEL || "Qwen/Qwen3.5-4B";
+const LARGE_MODEL = () => process.env.OPENAI_LARGE_MODEL || "Qwen/Qwen3.5-4B";
 
 export const axiomPlugin: Plugin = {
   name: "axiom-security-plugin",

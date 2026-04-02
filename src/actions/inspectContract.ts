@@ -9,7 +9,7 @@
  *      verification status in parallel via {@link getEthBalance}, {@link isEthContract},
  *      {@link getErc20Name}, {@link getErc20Symbol}, {@link checkContractVerification}.
  *   2. Builds a structured flag list (unverified source, ERC-20 type, EOA detection).
- *   3. Calls `runtime.useModel` (Qwen3.5-27B via Nosana) for a 3–4 sentence expert
+ *   3. Calls `runtime.useModel` (Qwen3.5-4B via Nosana) for a 3–4 sentence expert
  *      assessment of the address type and security implications.
  *
  * Solana flow:
@@ -17,7 +17,7 @@
  *      transaction signatures via Solana JSON-RPC.
  *   2. Derives account type (wallet, executable program, token account, PDA) using
  *      {@link deriveAccountType}.
- *   3. Calls `runtime.useModel` (Qwen3.5-27B via Nosana) for a 3–4 sentence
+ *   3. Calls `runtime.useModel` (Qwen3.5-4B via Nosana) for a 3–4 sentence
  *      Solana-specific assessment.
  *
  * Data sources: Etherscan V2 API (ETH verification), Ethplorer/ethRpc utils (ETH balance),

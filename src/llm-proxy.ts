@@ -47,7 +47,7 @@ function responsesToChat(body: any): any {
   };
 
   if (body.temperature !== undefined) req.temperature = body.temperature;
-  // Cap max tokens for faster responses — 27B model on 3090 is slow
+  // Cap max tokens for faster responses
   req.max_tokens = Math.min(body.max_output_tokens || 800, 800);
   if (body.stream) req.stream = body.stream;
 
@@ -182,7 +182,7 @@ const server = createServer(async (req: IncomingMessage, res: ServerResponse) =>
       object: "list",
       data: [
         {
-          id: "Qwen3.5-27B-AWQ-4bit",
+          id: "Qwen/Qwen3.5-4B",
           object: "model",
           created: Math.floor(Date.now() / 1000),
           owned_by: "nosana",

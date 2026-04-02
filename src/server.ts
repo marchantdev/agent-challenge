@@ -148,7 +148,7 @@ function handleHealth(res: ServerResponse): void {
     inferenceLatencyMs: avgLatency,
     actionsTriggered: Object.values(actionCounts).reduce((s, c) => s + c, 0),
     nosanaNode: process.env.NOSANA_NODE_ID || "local",
-    model: "Qwen3.5-27B-AWQ-4bit",
+    model: "Qwen/Qwen3.5-4B",
     lastHeartbeat: new Date().toISOString(),
   }));
 }

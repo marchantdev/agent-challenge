@@ -13,7 +13,7 @@
  *      - Exploit History (0-25): cross-referenced against DefiLlama /hacks
  *   4. Runs a rule-based risk scorer (smart contract, economic, concentration,
  *      volatility, oracle) to produce structured risk flags.
- *   5. Calls `runtime.useModel` with the Qwen3.5-27B-AWQ-4bit model (running on
+ *   5. Calls `runtime.useModel` with the Qwen/Qwen3.5-4B model (running on
  *      Nosana GPU) to generate a 3–4 sentence expert commentary.
  *   6. Returns a markdown report: Security Score first, then metrics, flags, AI analysis.
  *
